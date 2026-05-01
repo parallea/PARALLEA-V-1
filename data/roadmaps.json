@@ -1,0 +1,96 @@
+[
+  {
+    "id": "rmp_3002b08a68c04240",
+    "video_id": "35bbd66b",
+    "persona_id": "per_f50a51944ff04c58",
+    "title": "Machine learning with mathematics",
+    "summary": "FangFang lee teaches machine learning with mathematics clearly and patiently.",
+    "difficulty": "beginner",
+    "topics": [
+      "Machine",
+      "learning",
+      "with",
+      "mathematics"
+    ],
+    "created_at": "2026-04-30T09:51:07.747691+00:00",
+    "updated_at": "2026-04-30T09:51:07.747699+00:00"
+  },
+  {
+    "id": "rmp_7eadab9570e64551",
+    "video_id": "5e3093c9",
+    "persona_id": "per_f50a51944ff04c58",
+    "title": "Mathematics in Machine Learning",
+    "summary": "FangFang lee teaches mathematics in machine learning clearly and patiently.",
+    "difficulty": "beginner",
+    "topics": [
+      "Mathematics",
+      "Machine",
+      "Learning"
+    ],
+    "created_at": "2026-04-30T09:52:18.384431+00:00",
+    "updated_at": "2026-04-30T09:52:18.384442+00:00"
+  },
+  {
+    "id": "rmp_demo_guitar_lesson_1",
+    "video_id": "vid_demo_guitar_lesson_1",
+    "persona_id": "per_demo_guitar_coach",
+    "title": "First Guitar Lesson Roadmap",
+    "summary": "A beginner guitar path covering instrument basics, hand position, tuning, chords, strumming, and practice habits.",
+    "difficulty": "beginner",
+    "topics": [
+      "guitar basics",
+      "guitar parts",
+      "finger placement",
+      "basic chords",
+      "switching chords",
+      "strumming pattern",
+      "practice routine"
+    ],
+    "created_at": "2026-05-01T11:38:09.675632+00:00",
+    "updated_at": "2026-05-01T11:38:09.675642+00:00"
+  },
+  {
+    "id": "rmp_17f9ba11c4df428f",
+    "video_id": "c2ea6f24",
+    "persona_id": "per_0746a728bc584fad",
+    "title": "Mathematics in Machine learning",
+    "summary": "The lesson explains how machine learning depends on mathematics, especially linear algebra, to convert raw data into numerical forms computers can process. It introduces core data structures, similarity measures, matrix operations, and singular value decomposition as the basis for efficient large-scale ML.",
+    "difficulty": "beginner",
+    "topics": [
+      "Why machines need mathematics to process data",
+      "Linear algebra as the foundation of ML",
+      "Vectorization and numerical representations",
+      "Scalars, vectors, matrices, and tensors",
+      "Embeddings and similarity measures",
+      "Euclidean distance and cosine similarity",
+      "Dot products in vectors and matrices",
+      "Dimensionality reduction and SVD",
+      "Matrix factorization and large-scale ML",
+      "Why linear algebra matters in modern AI systems"
+    ],
+    "created_at": "2026-04-30T13:44:00.605092+00:00",
+    "updated_at": "2026-04-30T13:44:00.605106+00:00"
+  },
+  {
+    "id": "rmp_7f5c8ed4897d4a61",
+    "video_id": "3ac8f364",
+    "persona_id": "per_0746a728bc584fad",
+    "title": "Mathematics in machine learning",
+    "summary": "The video explains why linear algebra is foundational to machine learning: raw data is converted into numerical objects, compared with similarity measures, and transformed efficiently with matrix operations. It then shows how SVD and matrix factorization help reduce dimensionality and recover structure in large datasets such as movie ratings, with direct relevance to modern neural networks and LLMs.",
+    "difficulty": "beginner",
+    "topics": [
+      "Why machine learning needs mathematics",
+      "Linear algebra as the language of data",
+      "Vectorization of images, text, audio, video, and structured data",
+      "Scalars, vectors, matrices, and tensors",
+      "Euclidean distance and cosine similarity",
+      "Dot products and matrix multiplication",
+      "Dimensionality reduction",
+      "Singular value decomposition (SVD)",
+      "Matrix factorization for recommendation systems",
+      "How linear algebra supports neural networks and LLMs"
+    ],
+    "created_at": "2026-04-30T13:46:27.021183+00:00",
+    "updated_at": "2026-04-30T13:46:27.021197+00:00"
+  }
+]

@@ -1,0 +1,11 @@
+.idea
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.*
+data
+uploads
+thumbnails

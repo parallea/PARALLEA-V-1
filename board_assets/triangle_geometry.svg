@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 180">
+  <rect width="220" height="180" fill="none"/>
+  <path d="M42 136 94 48l92 88Z" fill="rgba(125,211,252,0.12)" stroke="#e86c2f" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M42 136h144M42 136V92" fill="none" stroke="#7dd3fc" stroke-width="3" stroke-linecap="round"/>
+  <path d="M54 136a14 14 0 0 1 0-14" fill="none" stroke="#7dd3fc" stroke-width="2"/>
+  <g fill="#e8e8e0" font-family="IBM Plex Mono, monospace" font-size="16">
+    <text x="32" y="150">a</text>
+    <text x="100" y="44">b</text>
+    <text x="190" y="142">c</text>
+    <text x="58" y="128">theta</text>
+  </g>
+</svg>

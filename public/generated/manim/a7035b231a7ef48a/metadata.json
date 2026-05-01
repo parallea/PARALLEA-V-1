@@ -1,0 +1,15 @@
+{
+  "key": "a7035b231a7ef48a",
+  "scene_name": "GeneratedScene",
+  "segment_id": "bad_code_fallback_b35aa44e",
+  "frame_number": 1,
+  "video_path": "D:\\copy\\to be deployed\\0 - Copy\\public\\generated\\manim\\a7035b231a7ef48a\\scene.mp4",
+  "video_url": "/generated/manim/a7035b231a7ef48a/scene.mp4?v=1777579017",
+  "scene_path": "D:\\copy\\to be deployed\\0 - Copy\\public\\generated\\manim\\a7035b231a7ef48a\\scene.py",
+  "render_log": "D:\\copy\\to be deployed\\0 - Copy\\public\\generated\\manim\\a7035b231a7ef48a\\render.log",
+  "command": "\"D:\\copy\\to be deployed\\0 - Copy\\.venv\\Scripts\\python.exe\" -m manim -ql \"D:\\copy\\to be deployed\\0 - Copy\\manim_runtime\\scenes\\a7035b231a7ef48a.py\" GeneratedScene --media_dir \"D:\\copy\\to be deployed\\0 - Copy\\manim_runtime\\work\\a7035b231a7ef48a\" --output_file scene.mp4 --disable_caching --format mp4",
+  "render_time_sec": 7.229,
+  "used_fallback": true,
+  "latex_available": false,
+  "text_only_mode": true
+}

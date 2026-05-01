@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 180">
+  <rect width="220" height="180" fill="none"/>
+  <g fill="none" stroke="#e86c2f" stroke-width="4" stroke-linecap="round">
+    <path d="M42 28c-8 0-12 6-12 16v92c0 10 4 16 12 16"/>
+    <path d="M178 28c8 0 12 6 12 16v92c0 10-4 16-12 16"/>
+  </g>
+  <g stroke="#7dd3fc" stroke-width="2">
+    <path d="M62 50h96M62 84h96M62 118h96"/>
+    <path d="M82 34v100M110 34v100M138 34v100"/>
+  </g>
+  <g fill="#e8e8e0" font-family="IBM Plex Mono, monospace" font-size="16">
+    <text x="68" y="74">a11</text>
+    <text x="96" y="74">a12</text>
+    <text x="124" y="74">a13</text>
+    <text x="68" y="108">a21</text>
+    <text x="96" y="108">a22</text>
+    <text x="124" y="108">a23</text>
+  </g>
+</svg>

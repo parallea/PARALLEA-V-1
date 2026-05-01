@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Parallea | AI teaching personas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#18201e;
+  --paper:#fbfaf6;
+  --panel:#ffffff;
+  --soft:#eef4f2;
+  --line:#d8e0dc;
+  --muted:#66736f;
+  --teal:#2f6f65;
+  --blue:#315a86;
+  --coral:#db6e45;
+  --gold:#d49b3c;
+  --shadow:0 24px 60px rgba(24,32,30,.1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font-family:'Space Grotesk',system-ui,sans-serif}
+body{background:
+  linear-gradient(180deg,#f8fbfa 0%,#fbfaf6 45%,#f2f6f4 100%);
+}
+a{color:inherit;text-decoration:none}
+button{font:inherit}
+.shell{max-width:1180px;margin:0 auto;padding:0 22px}
+.nav{position:sticky;top:0;z-index:20;background:rgba(251,250,246,.86);backdrop-filter:blur(18px);border-bottom:1px solid rgba(216,224,220,.75)}
+.nav-inner{height:72px;display:flex;align-items:center;justify-content:space-between;gap:18px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-mark{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--ink),var(--teal));display:grid;place-items:center;color:#fff;font-weight:700}
+.brand b{display:block;font-size:17px}
+.brand span{display:block;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.nav-links{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.link{font-size:14px;color:var(--muted);padding:9px 10px;border-radius:999px}
+.link:hover{background:#fff;color:var(--ink)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:11px 17px;background:#fff;color:var(--ink);font-weight:600;cursor:pointer;transition:.18s ease;white-space:nowrap}
+.btn:hover{transform:translateY(-1px);box-shadow:0 14px 30px rgba(24,32,30,.12)}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+.btn.teal{background:var(--teal);border-color:var(--teal);color:#fff}
+.hero{position:relative;min-height:680px;display:grid;align-items:center;overflow:hidden;border-bottom:1px solid var(--line)}
+.hero::before{content:"";position:absolute;inset:0;background:
+  linear-gradient(90deg,rgba(251,250,246,.96),rgba(251,250,246,.72) 48%,rgba(251,250,246,.28)),
+  linear-gradient(135deg,rgba(47,111,101,.14),transparent 36%),
+  repeating-linear-gradient(90deg,rgba(49,90,134,.08) 0 1px,transparent 1px 52px),
+  repeating-linear-gradient(0deg,rgba(219,110,69,.06) 0 1px,transparent 1px 52px);opacity:.92}
+.hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 72%,var(--paper));pointer-events:none}
+.hero-content{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,440px);gap:44px;align-items:center;padding:74px 22px 92px}
+.hero-copy{max-width:720px}
+.kicker{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--teal);font-weight:500}
+h1{margin:14px 0 18px;font-size:clamp(44px,7vw,82px);line-height:.95;letter-spacing:0;max-width:820px}
+.hero-copy p{margin:0;color:#40504b;font-size:18px;line-height:1.72;max-width:680px}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
+.persona-visual{position:relative;z-index:1;background:rgba(255,255,255,.86);border:1px solid rgba(216,224,220,.9);border-radius:28px;box-shadow:var(--shadow);padding:24px;display:grid;gap:18px}
+.avatar-row{display:flex;align-items:center;gap:16px}
+.avatar{width:78px;height:78px;border-radius:24px;background:linear-gradient(135deg,#f1c7a3,var(--coral));display:grid;place-items:center;color:#fff;font-size:28px;font-weight:700}
+.avatar-row b{display:block;font-size:22px}
+.avatar-row span{display:block;color:var(--muted);margin-top:4px}
+.voice-line{border:1px solid var(--line);border-radius:18px;padding:14px 16px;background:#f8fbfa;color:#40504b;line-height:1.55}
+.mini-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mini{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fff}
+.mini b{display:block;font-size:20px}
+.mini span{font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.08em}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border-radius:999px;background:#e9f2ef;color:var(--teal);padding:6px 10px;font-size:12px;font-weight:600}
+.section{padding:82px 0}
+.section-head{display:flex;align-items:end;justify-content:space-between;gap:22px;margin-bottom:24px}
+.section-head h2{margin:8px 0 0;font-size:clamp(30px,4vw,48px);line-height:1.03}
+.section-head p{margin:0;color:var(--muted);line-height:1.65;max-width:560px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:0 12px 32px rgba(24,32,30,.06)}
+.card .num{font-family:'IBM Plex Mono',monospace;color:var(--coral);font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+.card h3{margin:12px 0 8px;font-size:22px}
+.card p{margin:0;color:var(--muted);line-height:1.65}
+.band{background:#17201e;color:#f7fbfa}
+.band .kicker{color:#89d0c3}
+.band p,.band li{color:rgba(247,251,250,.72)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.panel{border:1px solid rgba(255,255,255,.12);border-radius:24px;padding:28px;background:rgba(255,255,255,.05)}
+.panel h2{margin:8px 0 12px;font-size:36px;line-height:1}
+.panel ul{margin:16px 0 0;padding-left:18px;line-height:1.8}
+.why{display:grid;grid-template-columns:360px 1fr;gap:28px;align-items:start}
+.why h2{margin:8px 0 14px;font-size:44px;line-height:1}
+.why-list{display:grid;gap:12px}
+.why-item{display:grid;grid-template-columns:120px 1fr;gap:18px;align-items:start;border-bottom:1px solid var(--line);padding:0 0 16px}
+.why-item b{color:var(--blue)}
+.demo-card{display:grid;grid-template-columns:300px 1fr auto;gap:22px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:26px;padding:24px;box-shadow:var(--shadow)}
+.guitar-tile{min-height:210px;border-radius:22px;background:linear-gradient(135deg,#201915,#6d4326 58%,#1f3330);display:grid;place-items:center;color:#ffe5c6;position:relative;overflow:hidden}
+.guitar-tile .neck{width:18px;height:142px;border-radius:999px;background:#c99056;position:absolute;top:20px}
+.guitar-tile .body{width:118px;height:132px;border-radius:44% 44% 48% 48%;background:#d98b43;border:5px solid #4c2e1d;position:absolute;bottom:24px}
+.guitar-tile .hole{width:34px;height:34px;border-radius:50%;background:#2a1710;position:absolute;bottom:84px}
+.demo-copy h2{margin:0 0 8px;font-size:32px}
+.demo-copy p{margin:0;color:var(--muted);line-height:1.65}
+.demo-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+footer{border-top:1px solid var(--line);padding:28px 0;color:var(--muted)}
+.footer-inner{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.footer-links{display:flex;gap:14px;flex-wrap:wrap}
+.footer-links a:hover{color:var(--ink)}
+@media (max-width:960px){
+  .hero{min-height:auto}
+  .hero::before{background:linear-gradient(180deg,rgba(251,250,246,.96),rgba(251,250,246,.86)),repeating-linear-gradient(90deg,rgba(49,90,134,.08) 0 1px,transparent 1px 44px)}
+  .hero-content,.two-col,.why,.demo-card{grid-template-columns:1fr}
+  .grid{grid-template-columns:1fr}
+  .section-head{display:block}
+  .nav-inner{height:auto;padding:14px 0;align-items:flex-start}
+  .nav-links{justify-content:flex-end}
+  .demo-card{align-items:stretch}
+}
+@media (max-width:620px){
+  .hero-content{padding-top:44px}
+  .persona-visual{padding:18px}
+  .mini-grid{grid-template-columns:1fr}
+  .why-item{grid-template-columns:1fr;gap:4px}
+  .nav-links .link{display:none}
+}
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="shell nav-inner">
+    <a class="brand" href="/">
+      <div class="brand-mark">P</div>
+      <div><b>Parallea</b><span>Teaching personas</span></div>
+    </a>
+    <nav class="nav-links">
+      <a class="link" href="#how">How it works</a>
+      <a class="link" href="#teachers">Teachers</a>
+      <a class="link" href="#students">Students</a>
+      <a class="btn" id="navLogin" href="/auth/login">Login</a>
+      <a class="btn primary" id="navSignup" href="/auth/signup">Sign up</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="shell hero-content">
+      <div class="hero-copy">
+        <div class="kicker">AI teaching-persona platform</div>
+        <h1>Turn teacher videos into interactive AI teaching personas.</h1>
+        <p>Teachers upload their lessons once. Students learn from an AI version of the teacher through real-time, personalized, step-by-step tutoring.</p>
+        <div class="actions">
+          <a class="btn primary" id="primaryCta" href="/auth/signup">Get started</a>
+          <a class="btn" id="secondaryCta" href="/auth/login">Explore teachers</a>
+        </div>
+      </div>
+      <aside class="persona-visual" aria-label="Teacher persona preview">
+        <div class="avatar-row">
+          <div class="avatar">GC</div>
+          <div>
+            <b>Guitar Coach</b>
+            <span>Guitar Teacher</span>
+          </div>
+        </div>
+        <div class="voice-line">"Let's slow it down. First get your fingers comfortable, then we will add rhythm."</div>
+        <div class="mini-grid">
+          <div class="mini"><b>1</b><span>Persona</span></div>
+          <div class="mini"><b>6</b><span>Parts</span></div>
+          <div class="mini"><b>7</b><span>Topics</span></div>
+        </div>
+        <div class="chips">
+          <span class="chip">chords</span>
+          <span class="chip">strumming</span>
+          <span class="chip">finger placement</span>
+          <span class="chip">practice routine</span>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <section class="section shell" id="how">
+    <div class="section-head">
+      <div>
+        <div class="kicker">How it works</div>
+        <h2>One teacher, one evolving persona.</h2>
+      </div>
+      <p>The product starts from the teacher, not the file. Videos become transcript, roadmap, topic context, and teaching style memory behind that teacher's avatar.</p>
+    </div>
+    <div class="grid">
+      <article class="card">
+        <div class="num">Step 01</div>
+        <h3>Teachers upload videos</h3>
+        <p>Lessons are transcribed and analyzed inside the teacher dashboard, with processing status kept visible.</p>
+      </article>
+      <article class="card">
+        <div class="num">Step 02</div>
+        <h3>The persona evolves</h3>
+        <p>The platform maintains one reusable prompt, style summary, avatar, voice, topics, and roadmap knowledge base per teacher.</p>
+      </article>
+      <article class="card">
+        <div class="num">Step 03</div>
+        <h3>Students learn interactively</h3>
+        <p>Students choose a teacher avatar, ask what they want to learn, and move through matched roadmap parts with live doubt solving.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="section band" id="teachers">
+    <div class="shell two-col">
+      <article class="panel">
+        <div class="kicker">For teachers</div>
+        <h2>Upload once. Keep improving.</h2>
+        <p>Your videos are not a public video grid. They become private teaching material that updates your AI persona.</p>
+        <ul>
+          <li>Upload lesson videos now; notes and PDFs can fit the same model later.</li>
+          <li>Review and edit the active persona prompt.</li>
+          <li>Control avatar, voice, topics, videos, and generated roadmaps.</li>
+          <li>Let every future video sharpen the same teacher identity.</li>
+        </ul>
+      </article>
+      <article class="panel" id="students">
+        <div class="kicker">For students</div>
+        <h2>Pick the teacher first.</h2>
+        <p>Students do not browse videos. They pick a teacher persona and learn through conversation, roadmap parts, and visual explanations.</p>
+        <ul>
+          <li>Select a teacher avatar by topic, style, or profession.</li>
+          <li>Ask what you want to learn in plain language.</li>
+          <li>Move part by part and ask doubts anytime.</li>
+          <li>Use Manim-powered visuals when an explanation needs a board.</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="section shell">
+    <div class="why">
+      <div>
+        <div class="kicker">Why different</div>
+        <h2>Normal videos are passive.</h2>
+        <p style="color:var(--muted);line-height:1.7">Parallea keeps the useful parts of video processing, but changes the user experience into live tutoring.</p>
+      </div>
+      <div class="why-list">
+        <div class="why-item"><b>Interactive</b><span>Students can pause the flow to ask a doubt before moving to the next roadmap part.</span></div>
+        <div class="why-item"><b>Personalized</b><span>The same teacher can explain differently depending on the student's topic and question.</span></div>
+        <div class="why-item"><b>Teacher style</b><span>Answers use the teacher persona prompt instead of a generic assistant voice.</span></div>
+        <div class="why-item"><b>Visual</b><span>When a topic needs a diagram or animation, the existing Manim pipeline can still render supporting visuals.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section shell" id="demo">
+    <div class="section-head">
+      <div>
+        <div class="kicker">Demo persona</div>
+        <h2>Try the guitar teacher.</h2>
+      </div>
+      <p>The old guitar tutorial has been represented as a teacher persona with topics, one demo video entry, and a structured roadmap.</p>
+    </div>
+    <article class="demo-card">
+      <div class="guitar-tile" aria-hidden="true">
+        <div class="neck"></div>
+        <div class="body"></div>
+        <div class="hole"></div>
+      </div>
+      <div class="demo-copy">
+        <h2>Guitar Coach</h2>
+        <p>Friendly, practical, beginner-focused guitar teaching. Explains slowly with step-by-step practice around chords, rhythm, finger placement, and common beginner mistakes.</p>
+        <div class="demo-meta">
+          <span class="chip">guitar basics</span>
+          <span class="chip">basic chords</span>
+          <span class="chip">strumming pattern</span>
+          <span class="chip">practice tips</span>
+        </div>
+      </div>
+      <a class="btn teal" id="demoCta" href="/auth/login">Open demo</a>
+    </article>
+  </section>
+</main>
+
+<footer>
+  <div class="shell footer-inner">
+    <div>Parallea teacher-persona prototype</div>
+    <div class="footer-links">
+      <a href="/auth/login">Login</a>
+      <a href="/auth/signup">Sign up</a>
+      <a id="footerTeacher" href="/auth/login">Teacher dashboard</a>
+      <a id="footerStudent" href="/auth/login">Student personas</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  function setHref(id, href){ var el=document.getElementById(id); if(el) el.href=href; }
+  fetch('/api/auth/me', {credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var user = data && data.user;
+      var primary = '/auth/signup';
+      var secondary = '/auth/login';
+      var demo = '/auth/login';
+      if(user && (user.role === 'teacher' || user.role === 'admin')){
+        primary = '/teacher/dashboard';
+        secondary = '/teacher/dashboard';
+        demo = '/teacher/dashboard';
+        var login = document.getElementById('navLogin');
+        var signup = document.getElementById('navSignup');
+        if(login) login.textContent = 'Dashboard';
+        if(signup) signup.textContent = 'Teacher studio';
+      } else if(user && user.role === 'student'){
+        primary = '/student/personas';
+        secondary = '/student/personas';
+        demo = '/student/learn/per_demo_guitar_coach';
+        var login2 = document.getElementById('navLogin');
+        var signup2 = document.getElementById('navSignup');
+        if(login2) login2.textContent = 'Teachers';
+        if(signup2) signup2.textContent = 'Continue learning';
+      }
+      setHref('primaryCta', primary);
+      setHref('secondaryCta', secondary);
+      setHref('demoCta', demo);
+      setHref('footerTeacher', user ? (user.role === 'teacher' || user.role === 'admin' ? '/teacher/dashboard' : '/student/personas') : '/auth/login');
+      setHref('footerStudent', user && user.role === 'student' ? '/student/personas' : '/auth/login');
+      setHref('navLogin', user ? secondary : '/auth/login');
+      setHref('navSignup', user ? primary : '/auth/signup');
+    })
+    .catch(function(){});
+})();
+</script>
+</body>
+</html>

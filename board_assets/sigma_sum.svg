@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 180">
+  <rect width="220" height="180" fill="none"/>
+  <g fill="#e86c2f">
+    <path d="M70 34h88v14h-58l42 40-42 44h60v14H68v-12l48-46-46-42V34Z"/>
+  </g>
+  <g fill="#7dd3fc" font-family="IBM Plex Mono, monospace">
+    <text x="26" y="102" font-size="58">S</text>
+    <text x="152" y="82" font-size="18">n</text>
+    <text x="148" y="126" font-size="18">i=1</text>
+  </g>
+</svg>

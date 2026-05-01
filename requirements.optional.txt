@@ -1,0 +1,4 @@
+# Optional extras are intentionally minimal after hosting simplification.
+# Add experimental dependencies here only if you explicitly re-enable them.
+assemblyai
+manim

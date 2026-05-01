@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Immersive learning · Parallea</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/student-learn.css">
+</head>
+<body>
+<div class="immersive-page" id="appShell" data-scene="avatar">
+  <header class="immersive-header">
+    <div class="brand"><b>Parallea</b><span>·</span><em id="hPersona">Teacher</em></div>
+    <div class="header-meta">
+      <span class="status-pill" id="stateLabel">connecting</span>
+      <a class="exit-btn" href="/student/personas">Change teacher</a>
+      <a class="exit-btn" href="/auth/logout">Sign out</a>
+    </div>
+  </header>
+
+  <main class="immersive-main">
+    <section class="scene avatar-scene" id="avatarScene" aria-live="polite">
+      <div class="avatar-stage" id="avatarStage">
+        <div class="avatar-blob" id="avatarBlob">T</div>
+        <img class="avatar-image" id="avatarImage" alt="">
+        <span class="speak-state" id="speakState">idle</span>
+      </div>
+      <div class="intro-copy">
+        <p class="eyebrow">Immersive lesson</p>
+        <h1 id="pName">Teacher</h1>
+        <p class="role" id="pRole">Profession</p>
+        <div class="topic-cloud" id="topicChips"></div>
+        <p class="voice-prompt" id="voicePrompt">Starting your session...</p>
+      </div>
+    </section>
+
+    <section class="scene video-scene hidden" id="videoScene" aria-live="polite">
+      <div class="mini-avatar" id="miniAvatar">
+        <div class="mini-avatar-blob" id="miniAvatarBlob">T</div>
+        <span id="miniSpeakState">watching</span>
+      </div>
+      <div class="video-shell">
+        <div class="video-head">
+          <div>
+            <span class="eyebrow">Original teacher video</span>
+            <h2 id="partTitle">Lesson part</h2>
+          </div>
+          <span class="time-pill" id="partTime">0s</span>
+        </div>
+        <video id="lessonVideo" playsinline controls></video>
+        <div class="video-status" id="videoStatus">Preparing the video part...</div>
+      </div>
+    </section>
+
+    <section class="scene clarify-scene hidden" id="clarifyScene" aria-live="polite">
+      <div class="clarify-avatar">
+        <div class="mini-avatar-blob" id="clarifyAvatarBlob">T</div>
+        <div>
+          <span class="eyebrow">Clarification</span>
+          <h2 id="clarifyTitle">Visual explanation</h2>
+        </div>
+        <span class="speak-state inline" id="clarifySpeakState">idle</span>
+      </div>
+      <div class="manim-shell">
+        <div class="manim-stage" id="manimStage">
+          <div class="manim-status" id="manimStatus">Rendering the visual explanation...</div>
+        </div>
+        <div class="cue-strip" id="cueStrip"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="voice-dock">
+    <button class="mic-control" id="micBtn" type="button" title="Enable microphone">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>
+      <span id="micLabel">Enable mic</span>
+    </button>
+    <div class="vad-meter" id="vadMeter"><span></span></div>
+    <p id="flowHint">Voice turns will appear here.</p>
+  </footer>
+</div>
+
+<audio id="audioPlayer" preload="auto"></audio>
+<script src="/student-learn.js"></script>
+<script>ParalleaImmersive.init();</script>
+</body>
+</html>

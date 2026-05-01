@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+python-multipart
+edge-tts
+openai
+groq
+openai-whisper
+torch
+sentence-transformers
+faiss-cpu
+bcrypt
+itsdangerous
+authlib
+httpx
+supabase

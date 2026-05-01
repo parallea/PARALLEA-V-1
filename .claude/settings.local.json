@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m backend.store.migrate)",
+      "Bash(python -c ' *)",
+      "Bash(python -m pip install \"passlib[bcrypt]\" itsdangerous authlib httpx)",
+      "Bash(python -c \"from passlib.context import CryptContext; ctx=CryptContext\\(schemes=['bcrypt']\\); h=ctx.hash\\('hello'\\); print\\('bcrypt ok:', ctx.verify\\('hello', h\\)\\)\")",
+      "Bash(python -c \"import bcrypt; h=bcrypt.hashpw\\(b'hello', bcrypt.gensalt\\(\\)\\); print\\('bcrypt direct ok:', bcrypt.checkpw\\(b'hello', h\\)\\)\")",
+      "Bash(PARALLEA_PERSONA_PIPELINE_MODE=stub python -m backend.services.persona_pipeline 5e3093c9)",
+      "Bash(PARALLEA_PERSONA_PIPELINE_MODE=stub python -m backend.services.persona_pipeline 35bbd66b)",
+      "Bash(python -c \"import manim_renderer as r; print\\('text_only_mode=', r.manim_text_only_mode\\(\\)\\); print\\('latex=', r.has_latex_available\\(\\)\\); print\\('public_url=', r.path_to_public_url\\(r.MANIM_OUTPUT_DIR / 'test' / 'scene.mp4'\\)\\)\")",
+      "Bash(python -m backend.scripts.test_manim_no_latex)",
+      "Bash(python -m backend.scripts.test_clarification_manim)",
+      "Bash(python -m backend.scripts.test_manim_render)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('manim_renderer.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('ai_prompts.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")"
+    ]
+  }
+}

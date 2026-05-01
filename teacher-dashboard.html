@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Teacher Studio · Parallea</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/teacher.css">
+</head>
+<body>
+<div id="navMount"></div>
+<main>
+  <section class="t-page-head">
+    <div>
+      <p class="kicker">Teacher Studio</p>
+      <h1>Your AI persona, today.</h1>
+      <p>Every video you upload sharpens this same persona. Students browse you &mdash; not your videos &mdash; and learn in your style.</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <a class="btn primary" href="/teacher/upload">Upload video</a>
+    </div>
+  </section>
+
+  <section id="personaOverview" class="card" style="margin-bottom:24px"></section>
+
+  <section style="margin-bottom:24px">
+    <div class="kicker" style="margin-bottom:10px">Analytics</div>
+    <div id="statsCards"></div>
+  </section>
+
+  <section class="split">
+    <div id="videosCard" class="card"></div>
+    <div>
+      <div id="avatarCard" class="card" style="margin-bottom:18px"></div>
+      <div id="promptCard" class="card"></div>
+    </div>
+  </section>
+</main>
+<script src="/teacher.js"></script>
+<script>ParalleaTeacher.initDashboard();</script>
+</body>
+</html>

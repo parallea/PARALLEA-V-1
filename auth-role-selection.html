@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pick your role · Parallea</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/auth.css">
+</head>
+<body>
+<main class="auth-shell">
+  <section class="auth-brand">
+    <div class="brand-mark">
+      <div class="mark">P</div>
+      <div>
+        <b>Parallea</b>
+        <span>Persona-led learning</span>
+      </div>
+    </div>
+    <div class="brand-body">
+      <p class="kicker">One last step</p>
+      <h1>Are you teaching or learning?</h1>
+      <p class="lede">We'll point you at the right home screen and shape your dashboard around what you do here.</p>
+    </div>
+  </section>
+
+  <section class="auth-card">
+    <header class="auth-card-head">
+      <p class="kicker">Choose your role</p>
+      <h2>How will you use Parallea?</h2>
+      <p class="muted">You can change this later in settings.</p>
+    </header>
+
+    <form id="roleForm" class="auth-form" novalidate>
+      <fieldset class="role-picker stacked">
+        <label>
+          <input type="radio" name="role" value="teacher" required>
+          <span class="role-card big">
+            <b>Teacher</b>
+            <small>Upload videos. Grow one AI persona. Reach students in your style.</small>
+          </span>
+        </label>
+        <label>
+          <input type="radio" name="role" value="student" required>
+          <span class="role-card big">
+            <b>Student</b>
+            <small>Browse teacher avatars, pick one, learn through voice and visuals.</small>
+          </span>
+        </label>
+      </fieldset>
+
+      <p class="error-msg" id="errorMsg" role="alert" hidden></p>
+
+      <button type="submit" class="btn-primary" id="submitBtn">
+        <span class="btn-label">Continue</span>
+        <span class="spinner" aria-hidden="true"></span>
+      </button>
+    </form>
+  </section>
+</main>
+<script src="/auth.js"></script>
+<script>
+  ParalleaAuth.init({ mode: 'role-selection' });
+</script>
+</body>
+</html>

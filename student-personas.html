@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pick a teacher · Parallea</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/student.css">
+</head>
+<body>
+<div id="navMount"></div>
+<main>
+  <section class="s-page-head">
+    <div>
+      <p class="kicker">Choose a teacher</p>
+      <h1>Pick the persona that matches how you want to learn.</h1>
+      <p>Every teacher on Parallea has one evolving AI persona that absorbs every video they upload. Hover a card to see their style, topics, and what they teach.</p>
+    </div>
+    <label class="search">
+      <input id="search" type="search" placeholder="Search by topic, name, or style…" autocomplete="off">
+      <button type="button">Filter</button>
+    </label>
+  </section>
+
+  <section id="personaGrid" class="persona-grid"></section>
+</main>
+<script src="/student.js"></script>
+<script>ParalleaStudent.initPersonaBrowse();</script>
+</body>
+</html>

@@ -1,0 +1,2523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Parallea V2 - Immersive Learning</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#080808;--surf:#0f0f0f;--s2:#151515;--s3:#1c1c1c;--bdr:#1f1f1f;--b2:#2a2a2a;
+      --txt:#ddd;--mut:#767676;--org:#e86c2f;--org-s:rgba(232,108,47,.09);--org-b:rgba(232,108,47,.22);
+      --cyan:#7dd3fc;--gold:#f2b84b;
+    }
+    html,body{height:100%;overflow:hidden;background:radial-gradient(circle at top,#171717,#080808 54%);color:var(--txt);font-family:'IBM Plex Sans',sans-serif}
+    body::before{content:"";position:fixed;inset:0;background:radial-gradient(circle at 12% 14%,rgba(232,108,47,.1),transparent 24%),radial-gradient(circle at 88% 22%,rgba(125,211,252,.08),transparent 22%),linear-gradient(140deg,rgba(255,255,255,.03),transparent 32%);pointer-events:none}
+    .page{display:grid;grid-template-rows:48px 1fr;height:100vh}
+    header{display:flex;align-items:center;justify-content:space-between;padding:0 1.2rem;background:rgba(15,15,15,.92);border-bottom:1px solid var(--bdr);backdrop-filter:blur(18px)}
+    .hl,.hr{display:flex;align-items:center;gap:.8rem}
+    .logo{font-family:'IBM Plex Mono',monospace;color:var(--txt);text-decoration:none}
+    .logo em{color:var(--org);font-style:normal}
+    .back-btn,.exit-btn,.board-clr,.tab,.diag-btn,.clip-jump,.seg-pill,.chip,.start-btn,.debug-btn{font-family:'IBM Plex Mono',monospace;background:none;color:var(--mut);border:1px solid var(--b2);cursor:pointer}
+    .back-btn,.exit-btn,.board-clr,.diag-btn,.clip-jump,.seg-pill,.chip,.start-btn,.debug-btn{padding:.36rem .75rem;font-size:.62rem}
+    .tab{padding:.24rem .75rem;font-size:.58rem}
+    .back-btn:hover,.exit-btn:hover,.board-clr:hover,.tab:hover,.diag-btn:hover,.clip-jump:hover,.seg-pill:hover,.chip:hover,.start-btn:hover,.debug-btn:hover{color:var(--org);border-color:var(--org)}
+    .mode-btn.active{color:var(--cyan);border-color:var(--cyan);background:rgba(125,211,252,.08)}
+    .main{display:grid;grid-template-columns:340px 1fr;overflow:hidden;min-height:0}
+    .left{display:flex;flex-direction:column;background:rgba(15,15,15,.92);border-right:1px solid var(--bdr);min-height:0}
+    .avatar-card{padding:1rem;border-bottom:1px solid var(--bdr)}
+    .avatar-stage{height:220px;border-radius:18px;background:radial-gradient(circle at top,rgba(232,108,47,.14),rgba(8,8,8,.96) 62%);border:1px solid rgba(232,108,47,.14);overflow:hidden;position:relative}
+    .speak-state{position:absolute;top:.8rem;right:.8rem;padding:.3rem .6rem;border-radius:999px;background:rgba(0,0,0,.48);border:1px solid rgba(232,108,47,.18);font-family:'IBM Plex Mono',monospace;font-size:.56rem;color:var(--org);letter-spacing:.08em;text-transform:uppercase}
+    .avatar-copy{padding-top:.8rem;display:grid;gap:.35rem}
+    .avatar-name{font-family:'IBM Plex Mono',monospace;font-size:.9rem;color:#fff}
+    .avatar-role,.avatar-voice,.avatar-lesson,.voice-hint{font-size:.72rem;color:var(--mut);line-height:1.6}
+    .avatar-lesson{color:var(--org)}
+    .voice-hint{color:#b7a392}
+    .conv{flex:1;overflow-y:auto;padding:.8rem;display:flex;flex-direction:column;gap:.65rem;min-height:0}
+    .msg{display:flex;gap:.45rem}
+    .msg.user{flex-direction:row-reverse}
+    .mav{width:19px;height:19px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:.52rem;margin-top:.14rem}
+    .msg.user .mav{background:var(--s3);border:1px solid var(--bdr);color:var(--mut)}
+    .msg.ai .mav{background:var(--org-s);border:1px solid var(--org-b);color:var(--org)}
+    .msg.system .mav{background:rgba(125,211,252,.1);border:1px solid rgba(125,211,252,.2);color:var(--cyan)}
+    .mbody{max-width:94%;display:flex;flex-direction:column;gap:.2rem}
+    .mbbl{padding:.48rem .72rem;font-size:.8rem;line-height:1.7;border-radius:16px}
+    .msg.user .mbbl{background:var(--s3);border:1px solid var(--bdr)}
+    .msg.ai .mbbl{background:rgba(232,108,47,.04);border:1px solid var(--org-b)}
+    .msg.system .mbbl{background:rgba(125,211,252,.04);border:1px solid rgba(125,211,252,.16)}
+    .mfup{font-size:.76rem;color:rgba(232,108,47,.72);padding:.08rem .7rem;font-style:italic}
+    .smsg{font-family:'IBM Plex Mono',monospace;font-size:.58rem;color:var(--mut);text-align:center;padding:.16rem}
+    .chips{display:none;flex-wrap:wrap;gap:.4rem;padding:.2rem .8rem .7rem;border-top:1px solid var(--bdr)}
+    .agent-bar{padding:.55rem .85rem;border-top:1px solid var(--bdr);display:grid;gap:.6rem;background:var(--s2)}
+    .agent-top{display:flex;align-items:center;justify-content:space-between;gap:.8rem}
+    .astate{font-family:'IBM Plex Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--org)}
+    .vad-bar{flex:1;height:4px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden}
+    .vad-fill{height:100%;background:linear-gradient(90deg,var(--org),var(--gold),var(--cyan));width:0%}
+    .agent-row{display:flex;align-items:center;gap:.45rem}
+    .start-btn{background:rgba(232,108,47,.08);border-color:var(--org-b);color:var(--org)}
+    .start-btn.active{background:rgba(232,108,47,.18);color:#fff;border-color:var(--org)}
+    .status-line{font-size:.68rem;color:#9b8d84;line-height:1.6}
+    .waveform-wrap{display:none;align-items:center;gap:.55rem;padding:.45rem .6rem;border:1px solid rgba(232,108,47,.16);background:rgba(232,108,47,.05)}
+    .waveform-wrap.active{display:flex}
+    .waveform-label{font-family:'IBM Plex Mono',monospace;font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:#f0b18a;white-space:nowrap}
+    #micWaveform{width:100%;height:28px;display:block}
+    .right{display:flex;flex-direction:column;background:#0a0e13;overflow:hidden;position:relative;min-height:0}
+    .board-hdr{padding:.65rem 1.1rem;background:rgba(15,15,15,.92);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;gap:1rem}
+    .board-lbl{font-family:'IBM Plex Mono',monospace;font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
+    .board-tabs{display:flex;gap:.4rem}
+    .tab.active{border-color:var(--org);color:var(--org);background:var(--org-s)}
+    .diagram-view,.notes-view{flex:1;position:relative;overflow:hidden}
+    .notes-view.hidden,.diagram-view.hidden{display:none}
+    .board-stage{position:absolute;inset:0;background:radial-gradient(circle at 12% 12%,rgba(232,108,47,.08),transparent 26%),radial-gradient(circle at 82% 14%,rgba(125,211,252,.07),transparent 24%),linear-gradient(180deg,#0a0e13,#06080c);overflow:hidden}
+    .layer{position:absolute;inset:0;display:none}
+    .layer.active{display:block}
+    #whiteboardCanvas,#chartCanvas{width:100%;height:100%;display:block}
+    #manimVideo{width:100%;height:100%;display:block;object-fit:contain;background:radial-gradient(circle at top,rgba(232,108,47,.08),transparent 24%),linear-gradient(180deg,#06080c,#0a0e13)}
+    .board-asset-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+    .board-asset{position:absolute;pointer-events:none;transform-origin:center center;--asset-rotation:rotate(0deg)}
+    .board-asset img{width:100%;height:100%;object-fit:contain;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.24))}
+    .board-asset-label{position:absolute;left:0;right:0;bottom:-16px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:.56rem;color:#b8b0aa;letter-spacing:.04em}
+    .board-asset.motion-float{animation:assetFloat 4.6s ease-in-out infinite}
+    .board-asset.motion-pulse{animation:assetPulse 3.2s ease-in-out infinite}
+    .board-asset.motion-drift{animation:assetDrift 5.2s ease-in-out infinite}
+    .mermaid-wrap{padding:1rem;overflow:auto;height:100%}
+    .mermaid-host{min-height:100%;display:flex;align-items:center;justify-content:center}
+    .diag-loader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:.75rem;pointer-events:none;background:rgba(4,4,4,.16)}
+    .diag-loader.hidden{display:none}
+    .dl-spin{width:26px;height:26px;border:1.5px solid var(--b2);border-top-color:var(--org);border-radius:50%;animation:spin .9s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .dl-txt{font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.08em;color:var(--mut)}
+    .diag-controls{position:absolute;bottom:.75rem;right:.75rem;display:flex;gap:.4rem;z-index:5}
+    .diag-btn{background:rgba(0,0,0,.6)}
+    .timeline-bar{position:absolute;left:1rem;right:1rem;bottom:.8rem;display:flex;gap:.4rem;z-index:5;flex-wrap:wrap}
+    .seg-pill{background:rgba(0,0,0,.64)}
+    .seg-pill.active{border-color:var(--org);color:var(--org);background:var(--org-s)}
+    .notes-view{overflow:auto;padding:1.6rem 2rem}
+    .bi{margin-bottom:.45rem}
+    .bi-title{font-family:'IBM Plex Mono',monospace;font-size:1.25rem;color:#eee}
+    .bi-bullet{font-size:.9rem;color:rgba(232,232,224,.68);padding-left:1rem;position:relative;line-height:1.7}
+    .bi-bullet::before{content:'-';position:absolute;left:0;color:var(--org)}
+    .bi-hl{font-family:'IBM Plex Mono',monospace;color:#f3ba87;background:rgba(232,108,47,.07);border-left:3px solid var(--org);padding:.45rem .75rem}
+    .bi-eq{font-family:'IBM Plex Mono',monospace;color:var(--cyan);background:rgba(125,211,252,.06);padding:.5rem .75rem}
+    .clip-bar{border-top:1px solid var(--bdr);padding:.7rem 1.1rem;display:none;align-items:center;gap:.8rem;background:rgba(15,15,15,.92)}
+    .clip-bar.visible{display:flex}
+    .clip-thumb{width:120px;height:68px;object-fit:cover;background:#000;border:1px solid var(--bdr);border-radius:12px}
+    .clip-info{flex:1}
+    .clip-lbl{font-family:'IBM Plex Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--org);margin-bottom:.15rem}
+    .clip-ts{font-size:.72rem;color:var(--mut);line-height:1.6}
+    .video-overlay{position:absolute;inset:1rem;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:1rem;padding:1rem;border-radius:20px;background:rgba(4,6,8,.94);border:1px solid rgba(232,108,47,.16);opacity:0;pointer-events:none;transform:translateY(12px) scale(.985);transition:.36s ease;z-index:6;backdrop-filter:blur(12px)}
+    .video-overlay.show{opacity:1;pointer-events:auto;transform:none}
+    .video-overlay.closing{opacity:0;transform:translateY(-10px) scale(.98)}
+    .video-frame{width:100%;height:100%;background:#000;border-radius:18px;overflow:hidden}
+    .video-frame video{width:100%;height:100%;object-fit:contain;display:block}
+    .clip-copy{padding:.3rem .2rem .3rem 0;display:grid;align-content:start;gap:.8rem}
+    .clip-copy h3{margin:0;font-size:1.45rem;line-height:1.18}
+    .clip-copy p{margin:0;color:#b8b0aa;line-height:1.75}
+    .debug-panel{position:absolute;top:4.2rem;right:1rem;width:min(440px,calc(100% - 2rem));max-height:calc(100% - 6rem);overflow:auto;padding:.9rem 1rem;border-radius:16px;background:rgba(7,10,14,.94);border:1px solid rgba(125,211,252,.18);box-shadow:0 18px 44px rgba(0,0,0,.34);z-index:7;display:none}
+    .debug-panel.open{display:block}
+    .debug-title{font-family:'IBM Plex Mono',monospace;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--cyan);margin-bottom:.65rem}
+    .debug-block{margin-bottom:.75rem;padding-bottom:.75rem;border-bottom:1px solid rgba(255,255,255,.06)}
+    .debug-block:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+    .debug-label{font-family:'IBM Plex Mono',monospace;font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:#9fb8ca;margin-bottom:.22rem}
+    .debug-copy{font-size:.72rem;line-height:1.65;color:#d8d7d2;white-space:pre-wrap;word-break:break-word}
+    .debug-pre{font-family:'IBM Plex Mono',monospace;font-size:.6rem;line-height:1.6;color:#d8d7d2;white-space:pre-wrap;word-break:break-word}
+    @keyframes assetFloat{0%,100%{transform:var(--asset-rotation) translateY(0)}50%{transform:var(--asset-rotation) translateY(-6px)}}
+    @keyframes assetPulse{0%,100%{transform:var(--asset-rotation) scale(1);opacity:.96}50%{transform:var(--asset-rotation) scale(1.04);opacity:1}}
+    @keyframes assetDrift{0%,100%{transform:var(--asset-rotation) translateX(0)}50%{transform:var(--asset-rotation) translateX(8px)}}
+    @media(max-width:980px){.main{grid-template-columns:1fr;grid-template-rows:360px 1fr}.video-overlay{grid-template-columns:1fr}}
+    @media(max-width:720px){header{padding:0 .8rem}.board-hdr{padding:.6rem .8rem}.notes-view{padding:1.1rem}.avatar-stage{height:180px}.clip-bar{flex-wrap:wrap}}
+  </style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div class="hl">
+      <button class="back-btn" onclick="exitPage()">back</button>
+      <a href="/" class="logo">parallea<em>.</em>ai</a>
+    </div>
+    <div class="hr">
+      <span id="aLabel" style="font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--mut)">starting</span>
+      <button class="exit-btn" onclick="jumpToPlayer()">back to video</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <aside class="left">
+      <section class="avatar-card">
+        <div class="avatar-stage" id="avatarStage"><div class="speak-state" id="speakState">idle</div></div>
+        <div class="avatar-copy">
+          <div class="avatar-name" id="avatarName">loading avatar</div>
+          <div class="avatar-role" id="avatarRole">Preparing the AI lesson guide.</div>
+          <div class="avatar-voice" id="voiceTag">voice</div>
+          <div class="avatar-lesson" id="lessonTag">lesson</div>
+          <div class="voice-hint" id="voiceHint">The lesson will greet you first. Then press start once to let the loop run by itself.</div>
+        </div>
+      </section>
+
+      <section class="conv" id="conv"></section>
+      <section class="chips" id="chips"></section>
+      <section class="agent-bar">
+        <div class="agent-top">
+          <div class="astate" id="aState">starting</div>
+          <div class="vad-bar"><div class="vad-fill" id="vFill"></div></div>
+        </div>
+        <div class="agent-row">
+          <button class="start-btn" id="listenBtn" onclick="toggleListening()">start immersive talk</button>
+          <button class="diag-btn mode-btn active" id="contextModeBtn" onclick="toggleVideoContextMode()">use video context: on</button>
+          <button class="diag-btn mode-btn active" id="visualizationModeBtn" onclick="toggleVisualizationMode()">change visualisation: Excalidraw</button>
+          <button class="diag-btn" onclick="replayVisuals()">replay visuals</button>
+          <button class="diag-btn" onclick="replayLastAnswer()">replay answer</button>
+          <button class="diag-btn" onclick="requestRepeatPrevious()">repeat previous</button>
+        </div>
+        <div class="status-line" id="statusText">The system waits for voice above threshold, thinks after two seconds of silence, answers, and then arms itself again until you stop.</div>
+        <div class="waveform-wrap" id="micWaveformWrap">
+          <span class="waveform-label">mic live</span>
+          <canvas id="micWaveform"></canvas>
+        </div>
+      </section>
+    </aside>
+
+    <main class="right">
+      <div class="board-hdr">
+        <span class="board-lbl">visual board</span>
+        <div class="board-tabs">
+          <button class="tab active" id="tabD" onclick="switchTab('diagram')">diagram</button>
+          <button class="tab" id="tabN" onclick="switchTab('notes')">notes</button>
+        </div>
+        <div style="display:flex;gap:.45rem">
+          <button class="debug-btn" id="debugToggleBtn" onclick="toggleDebugPanel()">debug</button>
+          <button class="board-clr" onclick="clearBoard()">clear x</button>
+        </div>
+      </div>
+
+      <div class="diagram-view" id="diagView">
+        <div class="board-stage" id="boardStage">
+          <div class="layer active" id="whiteboardLayer"><canvas id="whiteboardCanvas"></canvas><div class="board-asset-layer" id="boardAssetLayer"></div></div>
+          <div class="layer" id="mermaidLayer"><div class="mermaid-wrap"><div class="mermaid-host" id="mermaidHost"></div></div></div>
+          <div class="layer" id="chartLayer"><canvas id="chartCanvas"></canvas></div>
+          <div class="layer" id="manimLayer"><video id="manimVideo" muted playsinline></video></div>
+        </div>
+        <div class="video-overlay" id="videoOverlay">
+          <div class="video-frame"><video id="clipVideo" playsinline></video></div>
+          <div class="clip-copy">
+            <div class="clip-lbl">relevant source video</div>
+            <h3 id="clipLabel">Source moment</h3>
+            <p id="clipNarration">The lesson clip will replay here before the visualization takes over.</p>
+          </div>
+        </div>
+        <div class="diag-loader hidden" id="diagLoader"><div class="dl-spin"></div><span class="dl-txt">preparing synced visuals</span></div>
+        <div class="timeline-bar" id="timelineBar"></div>
+        <div class="diag-controls">
+          <button class="diag-btn" onclick="fitBoard()">fit</button>
+          <button class="diag-btn" onclick="jumpToClip()">open source</button>
+        </div>
+        <aside class="debug-panel" id="debugPanel">
+          <div class="debug-title">pipeline debug</div>
+          <div id="debugBody"></div>
+        </aside>
+      </div>
+
+      <div class="notes-view hidden" id="notesView"></div>
+
+      <div class="clip-bar" id="clipBar">
+        <video class="clip-thumb" id="clipThumb" muted></video>
+        <div class="clip-info"><div class="clip-lbl">from the video</div><div class="clip-ts" id="clipTs"></div></div>
+        <button class="clip-jump" onclick="jumpToClip()">jump to this moment</button>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
+
+mermaid.initialize({ startOnLoad:false, securityLevel:'loose', theme:'dark' });
+
+const API = window.location.origin;
+const params = new URLSearchParams(location.search);
+const VID_ID = params.get('id');
+const SID = params.get('sid') || ('s_' + Math.random().toString(36).slice(2,10));
+const AVATAR_ID = params.get('avatar');
+const PERSONAS = {girl_1:'Calm systems guide',girl_2:'Warm concept explainer',girl_3:'Sharp visual tutor',girl_4:'High-energy walkthrough lead',man_1:'Direct technical coach',man_2:'Measured intuition builder'};
+const STORAGE_VIDEO_CONTEXT_KEY = 'parallea_use_video_context';
+const STORAGE_VISUALIZATION_KEY = 'parallea_preferred_visualization';
+
+let vidInfo = null, avatars = [], currentAvatar = null;
+let curAudio = null, currentChart = null, currentVisualPayload = null, currentSegmentId = null, currentBridge = null, lastAnswerPlayback = null;
+let boardCtx = null, roughCanvas = null, boardAnimationFrame = 0, activeTab = 'diagram';
+let audioCtx = null, analyser = null, sourceNode = null;
+let currentAssetSignature = '', playbackToken = 0;
+let scene, camera, renderer, head, hair, hairFront, hairSideLeft, hairSideRight, mouth, torso, leftArm, rightArm, neck, leftBrow, rightBrow;
+let micStream = null, micRecorder = null, micChunks = [], isListening = false, clipTime = null, clipInterval = null;
+let micAudioCtx = null, micAnalyser = null, micSource = null, vadFrame = 0, speechActive = false, silenceSince = 0, processingTurn = false, chatBusy = false, discardTurn = false, voiceThreshold = 0.045, micWaveformFrame = 0;
+let useVideoContext = localStorage.getItem(STORAGE_VIDEO_CONTEXT_KEY) !== '0';
+let preferredVisualization = normalizeVisualizationPreference(localStorage.getItem(STORAGE_VISUALIZATION_KEY)) || 'excalidraw';
+let streamQueue = [], streamPlaybackRunning = false, streamDone = false, streamBridgeDone = true, streamCollectedAudio = [], liveAnswerMeta = null;
+let liveAnswerNode = null, streamPendingAudio = new Map(), readyAudioSegments = new Map();
+let streamRunToken = 0;
+let latestPipelineDebug = null, debugPanelOpen = false;
+
+function qs(id){ return document.getElementById(id); }
+function esc(text){ return String(text || '').replace(/[&<>"]/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+function sleep(ms){ return new Promise((resolve) => setTimeout(resolve, ms)); }
+function toUrl(path){ if(!path) return ''; return path.startsWith('http') ? path : `${API}${path}`; }
+function fmt(sec){ const m = Math.floor(sec / 60); const s = Math.floor(sec % 60).toString().padStart(2, '0'); return `${m}:${s}`; }
+function showLoader(on = true){ qs('diagLoader').classList.toggle('hidden', !on); }
+function setAState(label, detail = ''){ qs('aState').textContent = label; qs('aLabel').textContent = label; qs('speakState').textContent = label; if(detail) qs('statusText').textContent = detail; }
+function setVoiceHint(text){ if(text) qs('voiceHint').textContent = text; }
+function normalizeVisualizationPreference(value){ const mode = String(value || '').trim().toLowerCase(); return mode === 'manim' || mode === 'excalidraw' ? mode : ''; }
+function visualizationLabel(mode){ return mode === 'excalidraw' ? 'Excalidraw' : 'Manim'; }
+function exitPage(){ location.href = `/avatar-select?id=${encodeURIComponent(VID_ID)}&sid=${encodeURIComponent(SID)}`; }
+function jumpToPlayer(){ const t = clipTime !== null ? `&t=${Math.floor(clipTime)}` : ''; location.href = `/player?id=${encodeURIComponent(VID_ID)}${t}`; }
+function switchTab(tab){ activeTab = tab; qs('tabD').classList.toggle('active', tab === 'diagram'); qs('tabN').classList.toggle('active', tab === 'notes'); qs('diagView').classList.toggle('hidden', tab !== 'diagram'); qs('notesView').classList.toggle('hidden', tab !== 'notes'); }
+function syncVideoContextButton(){
+  const btn = qs('contextModeBtn');
+  if(!btn) return;
+  btn.classList.toggle('active', useVideoContext);
+  btn.textContent = `use video context: ${useVideoContext ? 'on' : 'off'}`;
+}
+function syncVisualizationButton(){
+  const btn = qs('visualizationModeBtn');
+  if(!btn) return;
+  btn.classList.add('active');
+  btn.textContent = `change visualisation: ${visualizationLabel(preferredVisualization)}`;
+}
+function renderPipelineDebug(){
+  const host = qs('debugBody');
+  if(!host) return;
+  if(!latestPipelineDebug){
+    host.innerHTML = `<div class="debug-block"><div class="debug-copy">No pipeline debug data yet.</div></div>`;
+    return;
+  }
+  const intent = latestPipelineDebug.intent || {};
+  const frames = Array.isArray(latestPipelineDebug.visualizersByFrame) ? latestPipelineDebug.visualizersByFrame : [];
+  const reuse = latestPipelineDebug.previousStateReuse || {};
+  const sceneJson = latestPipelineDebug.geminiSceneOutput ? JSON.stringify(latestPipelineDebug.geminiSceneOutput, null, 2) : '';
+  host.innerHTML = `
+    <div class="debug-block">
+      <div class="debug-label">intent</div>
+      <div class="debug-copy">mode: ${esc(intent.mode || '-')}</div>
+      <div class="debug-copy">normalized question: ${esc(latestPipelineDebug.normalizedQuestion || '-')}</div>
+    </div>
+    <div class="debug-block">
+      <div class="debug-label">first pass explanation</div>
+      <div class="debug-copy">${esc(latestPipelineDebug.firstPassExplanation || '-')}</div>
+    </div>
+    <div class="debug-block">
+      <div class="debug-label">visualizers by frame</div>
+      <div class="debug-copy">${frames.map((item) => `${item.frameId}: ${item.visualizer}${(item.selectedExcalidrawElements || []).length ? ` | elements: ${(item.selectedExcalidrawElements || []).join(', ')}` : ''}`).join('\n') || '-'}</div>
+    </div>
+    <div class="debug-block">
+      <div class="debug-label">previous state reuse</div>
+      <div class="debug-copy">explanation reused: ${reuse.explanationReused ? 'yes' : 'no'}</div>
+      <div class="debug-copy">scene reused: ${reuse.sceneReused ? 'yes' : 'no'}</div>
+      <div class="debug-copy">repeat state available: ${reuse.repeatStateAvailable ? 'yes' : 'no'}</div>
+    </div>
+    <div class="debug-block">
+      <div class="debug-label">gemini scene json</div>
+      <div class="debug-pre">${esc(sceneJson || '-')}</div>
+    </div>
+  `;
+}
+function setPipelineDebug(debug){
+  latestPipelineDebug = debug || null;
+  renderPipelineDebug();
+}
+function syncDebugPanel(){
+  const panel = qs('debugPanel');
+  const btn = qs('debugToggleBtn');
+  if(!panel) return;
+  panel.classList.toggle('open', debugPanelOpen);
+  if(btn) btn.textContent = debugPanelOpen ? 'hide debug' : 'debug';
+}
+window.toggleDebugPanel = () => {
+  debugPanelOpen = !debugPanelOpen;
+  syncDebugPanel();
+};
+window.toggleVideoContextMode = () => {
+  useVideoContext = !useVideoContext;
+  localStorage.setItem(STORAGE_VIDEO_CONTEXT_KEY, useVideoContext ? '1' : '0');
+  syncVideoContextButton();
+  currentBridge = null;
+  if(!useVideoContext){
+    qs('clipBar').classList.remove('visible');
+    qs('videoOverlay').classList.remove('show', 'closing');
+    clipTime = null;
+    addSystem('Direct teaching mode is on. The tutor will answer without transcript context or source clip replay.');
+    setVoiceHint('Direct teaching mode is active. Visuals and TTS stay on.');
+  } else {
+    addSystem('Video-context mode is on. The tutor can ground answers in transcript context and replay relevant source moments.');
+    setVoiceHint('Video-context mode is active. The tutor can use the source clip when it helps.');
+  }
+};
+window.toggleVisualizationMode = () => {
+  preferredVisualization = preferredVisualization === 'manim' ? 'excalidraw' : 'manim';
+  localStorage.setItem(STORAGE_VISUALIZATION_KEY, preferredVisualization);
+  syncVisualizationButton();
+  smsg(`visualisation set to ${visualizationLabel(preferredVisualization)} for the next response`);
+};
+window.requestRepeatPrevious = async () => {
+  if(chatBusy) return;
+  addSystem('Requesting the previous explanation again with the stored visual plan.');
+  await doChat('Can you please repeat it');
+};
+window.exitPage = exitPage;
+window.jumpToPlayer = jumpToPlayer;
+window.switchTab = switchTab;
+
+function addMessage(role, text, extra = ''){
+  const wrap = qs('conv');
+  const el = document.createElement('div');
+  el.className = `msg ${role}`;
+  const avatar = role === 'user' ? 'U' : role === 'system' ? 'i' : 'AI';
+  el.innerHTML = `<div class="mav">${avatar}</div><div class="mbody"><div class="mbbl">${esc(text)}</div>${extra}</div>`;
+  wrap.appendChild(el);
+  wrap.scrollTop = wrap.scrollHeight;
+  return el;
+}
+function addAIMsg(text, ts = null, src = null, sugg = []){
+  let extra = '';
+  if(src){ extra += `<div style="font-family:'IBM Plex Mono',monospace;font-size:.56rem;color:var(--mut);padding:.06rem .72rem">${esc(src)}</div>`; }
+  if(ts !== null && ts !== undefined){ extra += `<button class="clip-jump" onclick="showClip(${ts})">see in video</button>`; }
+  if(liveAnswerNode){
+    const bubble = liveAnswerNode.querySelector('.mbbl');
+    if(bubble) bubble.textContent = text || '';
+    const body = liveAnswerNode.querySelector('.mbody');
+    if(body) body.innerHTML = `<div class="mbbl">${esc(text)}</div>${extra}`;
+    liveAnswerNode = null;
+  } else {
+    addMessage('ai', text, extra);
+  }
+  renderChips(sugg || []);
+}
+function upsertFirstText(text){
+  const value = String(text || '').trim();
+  if(!value) return;
+  if(!liveAnswerNode){
+    liveAnswerNode = addMessage('ai', value);
+    return;
+  }
+  const bubble = liveAnswerNode.querySelector('.mbbl');
+  if(bubble) bubble.textContent = value;
+}
+function addFollowUp(text){
+  const wrap = qs('conv');
+  const el = document.createElement('div');
+  el.className = 'msg ai';
+  el.innerHTML = `<div class="mav">AI</div><div class="mbody"><div class="mfup">${esc(text)}</div></div>`;
+  wrap.appendChild(el);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+function addSystem(text){ addMessage('system', text); }
+function smsg(text){ const c = qs('conv'); const el = document.createElement('div'); el.className = 'smsg'; el.textContent = text; c.appendChild(el); c.scrollTop = c.scrollHeight; }
+function renderChips(items){ const bar = qs('chips'); if(!items || !items.length){ bar.style.display = 'none'; bar.innerHTML = ''; return; } bar.style.display = 'flex'; bar.innerHTML = items.map((item) => `<button class="chip" onclick="onChip(${JSON.stringify(item)})">${esc(item)}</button>`).join(''); }
+window.onChip = async (text) => { renderChips([]); addMessage('user', text); await doChat(text); };
+
+let noteQueue = [], noteBusy = false;
+function renderBoardActions(actions){ noteQueue.push(...(actions || [])); if(!noteBusy) void processNoteQueue(); }
+async function processNoteQueue(){ noteBusy = true; while(noteQueue.length){ await renderNote(noteQueue.shift()); await sleep(60); } noteBusy = false; }
+async function renderNote(item){
+  const host = qs('notesView');
+  if(item.type === 'clear'){ host.innerHTML = ''; return; }
+  const el = document.createElement('div');
+  if(item.type === 'title'){ el.className = 'bi bi-title'; el.textContent = item.text || ''; }
+  else if(item.type === 'equation'){ el.className = 'bi bi-eq'; el.textContent = item.text || ''; }
+  else if(item.type === 'highlight'){ el.className = 'bi bi-hl'; el.textContent = item.text || ''; }
+  else { el.className = 'bi bi-bullet'; el.textContent = item.text || ''; }
+  host.appendChild(el);
+  host.scrollTop = host.scrollHeight;
+}
+
+function initWhiteboard(){
+  const canvas = qs('whiteboardCanvas');
+  const stage = qs('boardStage').getBoundingClientRect();
+  canvas.width = stage.width * devicePixelRatio;
+  canvas.height = stage.height * devicePixelRatio;
+  canvas.style.width = `${stage.width}px`;
+  canvas.style.height = `${stage.height}px`;
+  boardCtx = canvas.getContext('2d');
+  boardCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  roughCanvas = rough.canvas(canvas);
+}
+function clearCanvas(){ if(boardCtx){ boardCtx.clearRect(0, 0, qs('whiteboardCanvas').width, qs('whiteboardCanvas').height); } }
+function clearAssetLayer(){ const host = qs('boardAssetLayer'); if(host) host.innerHTML = ''; currentAssetSignature = ''; }
+function syncBoardAssets(assets){
+  const host = qs('boardAssetLayer');
+  if(!host) return;
+  const list = Array.isArray(assets) ? assets : [];
+  const signature = JSON.stringify(list);
+  if(signature === currentAssetSignature) return;
+  currentAssetSignature = signature;
+  host.innerHTML = '';
+  if(!list.length) return;
+  const { w, h } = boardMetrics();
+  for(const asset of list){
+    const rect = getSlotRect(asset.slot || 'top_right', w, h);
+    const scale = String(asset.slot || '').startsWith('top_') ? 1.22 : String(asset.slot || '').startsWith('bottom_') ? 0.9 : 0.82;
+    const box = scaledRect(rect, scale, 0);
+    const el = document.createElement('div');
+    el.className = `board-asset motion-${asset.motion || 'float'}`;
+    el.style.left = `${box.x}px`;
+    el.style.top = `${box.y}px`;
+    el.style.width = `${box.w}px`;
+    el.style.height = `${box.h}px`;
+    const img = document.createElement('img');
+    img.src = toUrl(asset.url || '');
+    img.alt = asset.label || asset.name || 'board asset';
+    el.appendChild(img);
+    if(asset.label){
+      const label = document.createElement('div');
+      label.className = 'board-asset-label';
+      label.textContent = asset.label;
+      el.appendChild(label);
+    }
+    host.appendChild(el);
+  }
+}
+function stopManimVideo(){ const video = qs('manimVideo'); try{ video.pause(); }catch{} video.removeAttribute('src'); video.dataset.src = ''; video.load(); }
+function clearLayers(){ ['whiteboardLayer','mermaidLayer','chartLayer','manimLayer'].forEach((id) => qs(id).classList.remove('active')); qs('mermaidHost').innerHTML = ''; clearAssetLayer(); stopManimVideo(); if(currentChart){ try{ currentChart.destroy(); }catch{} currentChart = null; } clearCanvas(); }
+function activateLayer(kind){ clearLayers(); if(kind === 'mermaid') qs('mermaidLayer').classList.add('active'); else if(kind === 'chartjs') qs('chartLayer').classList.add('active'); else if(kind === 'manim') qs('manimLayer').classList.add('active'); else qs('whiteboardLayer').classList.add('active'); }
+function isStaticBoardKind(kind){ return kind === 'whiteboard' || kind === 'excalidraw'; }
+function wrapText(text, x, y, maxWidth, lineHeight, color = '#e8e8e0', font = '16px IBM Plex Sans'){
+  if(!boardCtx) return;
+  boardCtx.save();
+  boardCtx.fillStyle = color;
+  boardCtx.font = font;
+  const words = String(text || '').split(/\s+/);
+  let line = '';
+  let cursorY = y;
+  for(const word of words){
+    const test = line ? `${line} ${word}` : word;
+    if(boardCtx.measureText(test).width > maxWidth && line){ boardCtx.fillText(line, x, cursorY); line = word; cursorY += lineHeight; }
+    else line = test;
+  }
+  if(line) boardCtx.fillText(line, x, cursorY);
+  boardCtx.restore();
+}
+function drawBulletList(x, y, items, maxWidth = 280, color = '#e8e8e0'){
+  if(!boardCtx) return;
+  const list = Array.isArray(items) ? items : [];
+  let cursorY = y;
+  for(const item of list){
+    boardCtx.save();
+    boardCtx.fillStyle = '#e86c2f';
+    boardCtx.font = '16px IBM Plex Mono';
+    boardCtx.fillText('-', x, cursorY);
+    boardCtx.restore();
+    wrapText(item || '', x + 18, cursorY, maxWidth - 18, 20, color);
+    cursorY += 42;
+  }
+}
+function drawArrowHead(x1, y1, x2, y2, color){
+  if(!boardCtx) return;
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  const size = 10;
+  boardCtx.save();
+  boardCtx.strokeStyle = color;
+  boardCtx.lineWidth = 2;
+  boardCtx.beginPath();
+  boardCtx.moveTo(x2, y2);
+  boardCtx.lineTo(x2 - size * Math.cos(angle - Math.PI / 6), y2 - size * Math.sin(angle - Math.PI / 6));
+  boardCtx.moveTo(x2, y2);
+  boardCtx.lineTo(x2 - size * Math.cos(angle + Math.PI / 6), y2 - size * Math.sin(angle + Math.PI / 6));
+  boardCtx.stroke();
+  boardCtx.restore();
+}
+function clamp(num, min, max){ return Math.max(min, Math.min(max, num)); }
+function mix(a, b, t){ return a + ((b - a) * t); }
+function easeOutCubic(value){ const t = clamp(value, 0, 1); return 1 - Math.pow(1 - t, 3); }
+function boardMetrics(){ return { w: qs('whiteboardCanvas').width / devicePixelRatio, h: qs('whiteboardCanvas').height / devicePixelRatio }; }
+function getSlotRect(slot, w, h){
+  const slots = {
+    center:{ x:w*0.31, y:h*0.18, w:w*0.38, h:h*0.4 },
+    left:{ x:w*0.055, y:h*0.24, w:w*0.235, h:h*0.3 },
+    right:{ x:w*0.71, y:h*0.24, w:w*0.235, h:h*0.3 },
+    bottom_left:{ x:w*0.065, y:h*0.61, w:w*0.285, h:h*0.17 },
+    bottom_right:{ x:w*0.65, y:h*0.61, w:w*0.285, h:h*0.17 },
+    top_left:{ x:w*0.07, y:h*0.115, w:w*0.19, h:h*0.105 },
+    top_right:{ x:w*0.74, y:h*0.115, w:w*0.19, h:h*0.105 }
+  };
+  return slots[slot] || slots.center;
+}
+function scaledRect(rect, scale = 1, rise = 0){
+  const nextW = rect.w * scale;
+  const nextH = rect.h * scale;
+  return {
+    x: rect.x + ((rect.w - nextW) / 2),
+    y: rect.y + ((rect.h - nextH) / 2) - rise,
+    w: nextW,
+    h: nextH
+  };
+}
+function connectorPoints(fromRect, toRect){
+  const dx = (toRect.x + toRect.w / 2) - (fromRect.x + fromRect.w / 2);
+  const dy = (toRect.y + toRect.h / 2) - (fromRect.y + fromRect.h / 2);
+  let fx = fromRect.x + fromRect.w / 2;
+  let fy = fromRect.y + fromRect.h / 2;
+  let tx = toRect.x + toRect.w / 2;
+  let ty = toRect.y + toRect.h / 2;
+  if(Math.abs(dx) >= Math.abs(dy)){
+    fx = dx >= 0 ? fromRect.x + fromRect.w : fromRect.x;
+    fy = fromRect.y + fromRect.h / 2;
+    tx = dx >= 0 ? toRect.x : toRect.x + toRect.w;
+    ty = toRect.y + toRect.h / 2;
+  } else {
+    fx = fromRect.x + fromRect.w / 2;
+    fy = dy >= 0 ? fromRect.y + fromRect.h : fromRect.y;
+    tx = toRect.x + toRect.w / 2;
+    ty = dy >= 0 ? toRect.y : toRect.y + toRect.h;
+  }
+  const c1x = Math.abs(dx) >= Math.abs(dy) ? mix(fx, tx, 0.34) : fx;
+  const c1y = Math.abs(dx) >= Math.abs(dy) ? fy : mix(fy, ty, 0.34);
+  const c2x = Math.abs(dx) >= Math.abs(dy) ? mix(fx, tx, 0.66) : tx;
+  const c2y = Math.abs(dx) >= Math.abs(dy) ? ty : mix(fy, ty, 0.66);
+  return { fx, fy, tx, ty, c1x, c1y, c2x, c2y };
+}
+function drawBoardBackdrop(w, h, t, progress = 0){
+  if(!boardCtx) return;
+  boardCtx.save();
+  const bg = boardCtx.createLinearGradient(0, 0, 0, h);
+  bg.addColorStop(0, '#081018');
+  bg.addColorStop(0.52, '#09131c');
+  bg.addColorStop(1, '#050a11');
+  boardCtx.fillStyle = bg;
+  boardCtx.fillRect(0, 0, w, h);
+
+  const glow = boardCtx.createRadialGradient(w * 0.5, h * 0.34, 40, w * 0.5, h * 0.34, w * 0.5);
+  glow.addColorStop(0, 'rgba(232,108,47,0.08)');
+  glow.addColorStop(0.52, 'rgba(125,211,252,0.04)');
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  boardCtx.fillStyle = glow;
+  boardCtx.fillRect(0, 0, w, h);
+
+  boardCtx.strokeStyle = 'rgba(255,255,255,0.035)';
+  boardCtx.lineWidth = 1;
+  for(let y = 120; y < h - 60; y += 54){
+    const wobble = Math.sin((y * 0.017) + (t * 0.2)) * 5;
+    boardCtx.beginPath();
+    boardCtx.moveTo(52, y + wobble);
+    boardCtx.lineTo(w - 52, y - wobble);
+    boardCtx.stroke();
+  }
+
+  for(let i = 0; i < 42; i += 1){
+    const px = (i * 53.7) % w;
+    const py = ((i * 91.3) + (t * 12)) % h;
+    const alpha = 0.045 + (0.015 * Math.sin(t + i));
+    boardCtx.fillStyle = `rgba(255,255,255,${alpha})`;
+    boardCtx.fillRect(px, py, 1.2, 1.2);
+  }
+
+  boardCtx.strokeStyle = 'rgba(232,108,47,0.16)';
+  boardCtx.lineWidth = 2;
+  boardCtx.strokeRect(20, 20, w - 40, h - 40);
+  boardCtx.strokeStyle = 'rgba(125,211,252,0.09)';
+  boardCtx.strokeRect(28, 28, w - 56, h - 56);
+
+  const activeGlow = boardCtx.createLinearGradient(0, h - 24, w * progress, h - 24);
+  activeGlow.addColorStop(0, 'rgba(232,108,47,0)');
+  activeGlow.addColorStop(0.6, 'rgba(232,108,47,0.2)');
+  activeGlow.addColorStop(1, 'rgba(242,184,75,0.45)');
+  boardCtx.fillStyle = activeGlow;
+  boardCtx.fillRect(42, h - 18, Math.max(0, (w - 84) * progress), 3);
+  boardCtx.restore();
+}
+function drawBeatTrack(payload, progress, w){
+  const beats = (payload && payload.beats) || [];
+  if(!beats.length || !boardCtx) return;
+  const trackW = Math.min(280, Math.max(140, beats.length * 68));
+  const x = w - trackW - 56;
+  const y = 48;
+  boardCtx.save();
+  boardCtx.fillStyle = 'rgba(7,11,16,0.7)';
+  boardCtx.strokeStyle = 'rgba(125,211,252,0.14)';
+  boardCtx.lineWidth = 1.2;
+  boardCtx.beginPath();
+  boardCtx.roundRect(x, y - 12, trackW, 28, 14);
+  boardCtx.fill();
+  boardCtx.stroke();
+  beats.forEach((beat, idx) => {
+    const gap = 10;
+    const segW = (trackW - 22 - (gap * (beats.length - 1))) / beats.length;
+    const sx = x + 11 + idx * (segW + gap);
+    const active = progress >= Number(beat.start_pct || 0) && progress <= Number(beat.end_pct || 1) + 0.001;
+    const complete = progress > Number(beat.end_pct || 1);
+    boardCtx.fillStyle = complete ? 'rgba(232,108,47,0.42)' : active ? 'rgba(242,184,75,0.5)' : 'rgba(255,255,255,0.08)';
+    boardCtx.strokeStyle = active ? 'rgba(242,184,75,0.92)' : 'rgba(125,211,252,0.16)';
+    boardCtx.beginPath();
+    boardCtx.roundRect(sx, y - 1, segW, 6, 4);
+    boardCtx.fill();
+    boardCtx.stroke();
+  });
+  drawMonoText('board flow', x + 14, y + 11, 11, '#7dd3fc', 0.88);
+  boardCtx.restore();
+}
+function findActiveBeat(payload, progress){
+  const beats = (payload && payload.beats) || [];
+  for(const beat of beats){
+    if(progress >= (beat.start_pct || 0) && progress <= (beat.end_pct || 1) + 0.001) return beat;
+  }
+  return beats[beats.length - 1] || null;
+}
+function revealProgressForObject(payload, objId, progress){
+  const beats = (payload && payload.beats) || [];
+  const first = beats.find((beat) => Array.isArray(beat.focus) && beat.focus.includes(objId));
+  const start = first ? Number(first.start_pct || 0) : 0;
+  return clamp((progress - start + 0.08) / 0.14, 0, 1);
+}
+function drawChalkText(text, x, y, size = 18, color = '#e8e8e0', alpha = 1, align = 'left'){
+  if(!boardCtx || !text) return;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.fillStyle = color;
+  boardCtx.font = `${size}px IBM Plex Sans`;
+  boardCtx.textAlign = align;
+  boardCtx.fillText(text, x, y);
+  boardCtx.restore();
+}
+function drawMonoText(text, x, y, size = 15, color = '#7dd3fc', alpha = 1, align = 'left'){
+  if(!boardCtx || !text) return;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.fillStyle = color;
+  boardCtx.font = `${size}px IBM Plex Mono`;
+  boardCtx.textAlign = align;
+  boardCtx.fillText(text, x, y);
+  boardCtx.restore();
+}
+function drawSceneCard(rect, focus = false, alpha = 1){
+  if(!boardCtx) return;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  const fill = boardCtx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+  fill.addColorStop(0, focus ? 'rgba(36,24,15,0.82)' : 'rgba(17,15,13,0.74)');
+  fill.addColorStop(1, focus ? 'rgba(18,16,14,0.92)' : 'rgba(10,10,12,0.9)');
+  boardCtx.fillStyle = fill;
+  boardCtx.shadowColor = focus ? 'rgba(242,184,75,0.2)' : 'rgba(232,108,47,0.1)';
+  boardCtx.shadowBlur = focus ? 24 : 14;
+  boardCtx.shadowOffsetY = 8;
+  boardCtx.beginPath();
+  boardCtx.roundRect(rect.x, rect.y, rect.w, rect.h, 16);
+  boardCtx.fill();
+  boardCtx.shadowBlur = 0;
+  boardCtx.lineWidth = focus ? 2.8 : 1.6;
+  boardCtx.strokeStyle = focus ? 'rgba(242,184,75,0.92)' : 'rgba(232,108,47,0.64)';
+  boardCtx.stroke();
+  boardCtx.strokeStyle = 'rgba(125,211,252,0.09)';
+  boardCtx.lineWidth = 1;
+  boardCtx.beginPath();
+  boardCtx.roundRect(rect.x + 6, rect.y + 6, rect.w - 12, rect.h - 12, 12);
+  boardCtx.stroke();
+  boardCtx.fillStyle = focus ? 'rgba(242,184,75,0.14)' : 'rgba(125,211,252,0.08)';
+  boardCtx.beginPath();
+  boardCtx.roundRect(rect.x + 12, rect.y + 12, Math.max(44, rect.w * 0.32), 5, 3);
+  boardCtx.fill();
+  boardCtx.restore();
+}
+function drawCaptionShield(rect, alpha = 1){
+  if(!boardCtx) return;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  const topFill = boardCtx.createLinearGradient(rect.x, rect.y + 8, rect.x, rect.y + 42);
+  topFill.addColorStop(0, 'rgba(6,10,15,0.96)');
+  topFill.addColorStop(1, 'rgba(6,10,15,0.78)');
+  boardCtx.fillStyle = topFill;
+  boardCtx.beginPath();
+  boardCtx.roundRect(rect.x + 10, rect.y + 10, rect.w - 20, 30, 12);
+  boardCtx.fill();
+  const bottomFill = boardCtx.createLinearGradient(rect.x, rect.y + rect.h - 50, rect.x, rect.y + rect.h - 8);
+  bottomFill.addColorStop(0, 'rgba(6,10,15,0.74)');
+  bottomFill.addColorStop(1, 'rgba(6,10,15,0.96)');
+  boardCtx.fillStyle = bottomFill;
+  boardCtx.beginPath();
+  boardCtx.roundRect(rect.x + 10, rect.y + rect.h - 46, rect.w - 20, 36, 12);
+  boardCtx.fill();
+  boardCtx.restore();
+}
+function drawObjectCaption(rect, label, detail, alpha = 1){
+  if(!boardCtx) return;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.font = '12px IBM Plex Mono';
+  const labelText = label || '';
+  const labelW = clamp(boardCtx.measureText(labelText).width + 24, 74, rect.w - 20);
+  boardCtx.fillStyle = 'rgba(8,11,16,0.82)';
+  boardCtx.strokeStyle = 'rgba(242,184,75,0.54)';
+  boardCtx.lineWidth = 1.2;
+  boardCtx.beginPath();
+  boardCtx.roundRect(rect.x + 12, rect.y + 12, labelW, 24, 12);
+  boardCtx.fill();
+  boardCtx.stroke();
+  boardCtx.restore();
+  drawMonoText(labelText, rect.x + 24, rect.y + 28, 12, '#f2b84b', alpha);
+  if(detail){
+    boardCtx.save();
+    boardCtx.globalAlpha = alpha * 0.9;
+    boardCtx.fillStyle = 'rgba(8,11,16,0.7)';
+    boardCtx.strokeStyle = 'rgba(125,211,252,0.12)';
+    boardCtx.lineWidth = 1;
+    boardCtx.beginPath();
+    boardCtx.roundRect(rect.x + 12, rect.y + rect.h - 42, rect.w - 24, 32, 10);
+    boardCtx.fill();
+    boardCtx.stroke();
+    boardCtx.restore();
+    wrapText(detail, rect.x + 20, rect.y + rect.h - 22, rect.w - 40, 14, 'rgba(232,232,224,0.82)', '13px IBM Plex Sans');
+  }
+}
+function bezierPoint(p0, p1, p2, p3, t){
+  const u = 1 - t;
+  const tt = t * t, uu = u * u, uuu = uu * u, ttt = tt * t;
+  return {
+    x: (uuu * p0.x) + (3 * uu * t * p1.x) + (3 * u * tt * p2.x) + (ttt * p3.x),
+    y: (uuu * p0.y) + (3 * uu * t * p1.y) + (3 * u * tt * p2.y) + (ttt * p3.y)
+  };
+}
+function drawAtomObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.strokeStyle = 'rgba(125,211,252,0.55)';
+  boardCtx.lineWidth = 1.6;
+  for(let i = 0; i < 3; i += 1){
+    boardCtx.beginPath();
+    boardCtx.ellipse(cx, cy, rect.w * (0.18 + i * 0.07), rect.h * (0.12 + i * 0.05), i * 0.7, 0, Math.PI * 2);
+    boardCtx.stroke();
+  }
+  const nucleus = [
+    { x: cx - 12, y: cy, c:'#e86c2f' },
+    { x: cx + 10, y: cy - 4, c:'#7dd3fc' },
+    { x: cx - 1, y: cy + 10, c:'#f2b84b' }
+  ];
+  for(const item of nucleus){
+    boardCtx.fillStyle = item.c;
+    boardCtx.beginPath();
+    boardCtx.arc(item.x, item.y, 8, 0, Math.PI * 2);
+    boardCtx.fill();
+  }
+  for(let i = 0; i < 3; i += 1){
+    const angle = (t * (1.1 + i * 0.18)) + (i * 2.1);
+    const rx = rect.w * (0.18 + i * 0.07);
+    const ry = rect.h * (0.12 + i * 0.05);
+    const ex = cx + Math.cos(angle) * rx;
+    const ey = cy + Math.sin(angle) * ry;
+    boardCtx.fillStyle = '#e8e8e0';
+    boardCtx.beginPath();
+    boardCtx.arc(ex, ey, 5, 0, Math.PI * 2);
+    boardCtx.fill();
+  }
+  boardCtx.restore();
+}
+function drawBloodFlowObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const p0 = { x: rect.x + 18, y: rect.y + rect.h * 0.64 };
+  const p1 = { x: rect.x + rect.w * 0.28, y: rect.y + rect.h * 0.18 };
+  const p2 = { x: rect.x + rect.w * 0.68, y: rect.y + rect.h * 0.84 };
+  const p3 = { x: rect.x + rect.w - 18, y: rect.y + rect.h * 0.38 };
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.lineWidth = 18;
+  boardCtx.strokeStyle = 'rgba(125,211,252,0.18)';
+  boardCtx.beginPath();
+  boardCtx.moveTo(p0.x, p0.y);
+  boardCtx.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+  boardCtx.stroke();
+  boardCtx.lineWidth = 3.2;
+  boardCtx.strokeStyle = '#7dd3fc';
+  boardCtx.stroke();
+  for(let i = 0; i < 9; i += 1){
+    const pos = bezierPoint(p0, p1, p2, p3, (t * 0.18 + i * 0.11) % 1);
+    boardCtx.fillStyle = i % 2 ? '#e86c2f' : '#f87171';
+    boardCtx.beginPath();
+    boardCtx.ellipse(pos.x, pos.y, 8, 5, 0.25, 0, Math.PI * 2);
+    boardCtx.fill();
+  }
+  boardCtx.restore();
+}
+function drawLungsObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const breath = 1 + (Math.sin(t * 2.2) * 0.06);
+  const cx = rect.x + rect.w / 2;
+  const top = rect.y + 24;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.strokeStyle = '#7dd3fc';
+  boardCtx.lineWidth = 6;
+  boardCtx.beginPath();
+  boardCtx.moveTo(cx, top);
+  boardCtx.lineTo(cx, rect.y + rect.h * 0.34);
+  boardCtx.stroke();
+  const lobes = [
+    { dx: -rect.w * 0.15, sx: -1 },
+    { dx: rect.w * 0.15, sx: 1 }
+  ];
+  for(const lobe of lobes){
+    boardCtx.save();
+    boardCtx.translate(cx + lobe.dx, rect.y + rect.h * 0.54);
+    boardCtx.scale(breath, breath);
+    boardCtx.fillStyle = 'rgba(232,108,47,0.14)';
+    boardCtx.strokeStyle = '#e86c2f';
+    boardCtx.lineWidth = 3;
+    boardCtx.beginPath();
+    boardCtx.moveTo(0, -36);
+    boardCtx.bezierCurveTo(40 * lobe.sx, -48, 56 * lobe.sx, 6, 18 * lobe.sx, 58);
+    boardCtx.bezierCurveTo(-8 * lobe.sx, 44, -18 * lobe.sx, 8, 0, -36);
+    boardCtx.closePath();
+    boardCtx.fill();
+    boardCtx.stroke();
+    boardCtx.restore();
+  }
+  for(let i = 0; i < 6; i += 1){
+    const y = rect.y + rect.h * 0.22 + ((t * 28 + i * 18) % (rect.h * 0.3));
+    drawMonoText('o', cx + (i % 2 ? -8 : 8), y, 12, '#f2b84b', alpha, 'center');
+  }
+  boardCtx.restore();
+}
+function drawNeuralNetObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const layers = [3, 4, 3];
+  const nodes = [];
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  for(let li = 0; li < layers.length; li += 1){
+    const x = rect.x + 32 + (li * (rect.w - 64) / (layers.length - 1));
+    for(let ni = 0; ni < layers[li]; ni += 1){
+      const y = rect.y + 30 + (ni * (rect.h - 60) / Math.max(layers[li] - 1, 1));
+      nodes.push({ id:`${li}_${ni}`, layer:li, x, y });
+    }
+  }
+  for(const a of nodes){
+    for(const b of nodes){
+      if(b.layer === a.layer + 1){
+        boardCtx.strokeStyle = 'rgba(125,211,252,0.24)';
+        boardCtx.lineWidth = 1.4;
+        boardCtx.beginPath();
+        boardCtx.moveTo(a.x, a.y);
+        boardCtx.lineTo(b.x, b.y);
+        boardCtx.stroke();
+        const s = ((t * 0.7) + (a.y + b.y) / 600) % 1;
+        const px = a.x + ((b.x - a.x) * s);
+        const py = a.y + ((b.y - a.y) * s);
+        boardCtx.fillStyle = '#f2b84b';
+        boardCtx.beginPath();
+        boardCtx.arc(px, py, 3, 0, Math.PI * 2);
+        boardCtx.fill();
+      }
+    }
+  }
+  for(const node of nodes){
+    boardCtx.fillStyle = node.layer === 1 ? '#e86c2f' : '#7dd3fc';
+    boardCtx.beginPath();
+    boardCtx.arc(node.x, node.y, 7, 0, Math.PI * 2);
+    boardCtx.fill();
+  }
+  boardCtx.restore();
+}
+function drawMatrixObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const rows = 5, cols = 5;
+  const cellW = (rect.w - 32) / cols;
+  const cellH = (rect.h - 32) / rows;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  for(let r = 0; r < rows; r += 1){
+    for(let c = 0; c < cols; c += 1){
+      const x = rect.x + 16 + c * cellW;
+      const y = rect.y + 16 + r * cellH;
+      const active = ((Math.floor(t * 3) + r + c) % 4) === 0;
+      boardCtx.fillStyle = active ? 'rgba(125,211,252,0.28)' : 'rgba(232,108,47,0.05)';
+      boardCtx.strokeStyle = active ? '#7dd3fc' : 'rgba(232,108,47,0.38)';
+      boardCtx.lineWidth = 1.2;
+      boardCtx.beginPath();
+      boardCtx.roundRect(x, y, cellW - 6, cellH - 6, 6);
+      boardCtx.fill();
+      boardCtx.stroke();
+    }
+  }
+  boardCtx.restore();
+}
+function drawCartesianPlaneObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const ox = rect.x + rect.w * 0.18;
+  const oy = rect.y + rect.h * 0.78;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.strokeStyle = '#7dd3fc';
+  boardCtx.lineWidth = 2.2;
+  boardCtx.beginPath(); boardCtx.moveTo(ox, rect.y + 16); boardCtx.lineTo(ox, oy); boardCtx.lineTo(rect.x + rect.w - 16, oy); boardCtx.stroke();
+  boardCtx.strokeStyle = '#e86c2f';
+  boardCtx.lineWidth = 3;
+  boardCtx.beginPath();
+  for(let i = 0; i <= 60; i += 1){
+    const px = ox + (i / 60) * (rect.w - 34);
+    const py = oy - ((Math.sin((i / 60) * 4 + t) * 0.24 + 0.42) * (rect.h - 52));
+    if(i === 0) boardCtx.moveTo(px, py); else boardCtx.lineTo(px, py);
+  }
+  boardCtx.stroke();
+  const dotX = ox + (((t * 0.2) % 1) * (rect.w - 34));
+  const dotY = oy - ((Math.sin((((t * 0.2) % 1) * 4) + t) * 0.24 + 0.42) * (rect.h - 52));
+  boardCtx.fillStyle = '#f2b84b';
+  boardCtx.beginPath(); boardCtx.arc(dotX, dotY, 5, 0, Math.PI * 2); boardCtx.fill();
+  boardCtx.restore();
+}
+function drawWaveObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.strokeStyle = '#7dd3fc';
+  boardCtx.lineWidth = 2;
+  boardCtx.beginPath();
+  boardCtx.moveTo(rect.x + 14, rect.y + rect.h / 2);
+  boardCtx.lineTo(rect.x + rect.w - 14, rect.y + rect.h / 2);
+  boardCtx.stroke();
+  boardCtx.strokeStyle = '#e86c2f';
+  boardCtx.lineWidth = 3;
+  boardCtx.beginPath();
+  for(let i = 0; i <= 80; i += 1){
+    const x = rect.x + 14 + (i / 80) * (rect.w - 28);
+    const y = rect.y + rect.h / 2 + Math.sin((i / 80) * 10 + t * 3) * (rect.h * 0.18);
+    if(i === 0) boardCtx.moveTo(x, y); else boardCtx.lineTo(x, y);
+  }
+  boardCtx.stroke();
+  boardCtx.restore();
+}
+function drawVectorAxesObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const ox = rect.x + rect.w * 0.24;
+  const oy = rect.y + rect.h * 0.76;
+  const angle = -0.8 + Math.sin(t * 1.3) * 0.18;
+  const len = rect.h * 0.48;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.strokeStyle = '#7dd3fc';
+  boardCtx.lineWidth = 2.3;
+  boardCtx.beginPath(); boardCtx.moveTo(ox, rect.y + 18); boardCtx.lineTo(ox, oy); boardCtx.lineTo(rect.x + rect.w - 18, oy); boardCtx.stroke();
+  const ex = ox + Math.cos(angle) * len;
+  const ey = oy + Math.sin(angle) * len;
+  boardCtx.strokeStyle = '#e86c2f';
+  boardCtx.lineWidth = 4;
+  boardCtx.beginPath(); boardCtx.moveTo(ox, oy); boardCtx.lineTo(ex, ey); boardCtx.stroke();
+  drawArrowHead(ox, oy, ex, ey, '#e86c2f');
+  boardCtx.restore();
+}
+function drawBeakerObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const left = rect.x + rect.w * 0.28, right = rect.x + rect.w * 0.72, top = rect.y + 22, bottom = rect.y + rect.h - 18;
+  const fluid = rect.y + rect.h * (0.52 + Math.sin(t * 1.6) * 0.03);
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.strokeStyle = '#7dd3fc';
+  boardCtx.lineWidth = 3;
+  boardCtx.beginPath();
+  boardCtx.moveTo(left, top);
+  boardCtx.lineTo(left, bottom);
+  boardCtx.lineTo(right, bottom);
+  boardCtx.lineTo(right, top);
+  boardCtx.stroke();
+  boardCtx.fillStyle = 'rgba(232,108,47,0.18)';
+  boardCtx.beginPath();
+  boardCtx.moveTo(left + 2, fluid);
+  for(let i = 0; i <= 20; i += 1){
+    const x = left + 2 + (i / 20) * (right - left - 4);
+    const y = fluid + Math.sin((i / 20) * 8 + t * 2.4) * 4;
+    if(i === 0) boardCtx.moveTo(x, y); else boardCtx.lineTo(x, y);
+  }
+  boardCtx.lineTo(right - 2, bottom - 2);
+  boardCtx.lineTo(left + 2, bottom - 2);
+  boardCtx.closePath();
+  boardCtx.fill();
+  for(let i = 0; i < 5; i += 1){
+    const x = left + 18 + ((i * 24 + (t * 18)) % (right - left - 36));
+    const y = bottom - 18 - ((t * 16 + i * 12) % 42);
+    boardCtx.strokeStyle = '#f2b84b';
+    boardCtx.beginPath();
+    boardCtx.arc(x, y, 4, 0, Math.PI * 2);
+    boardCtx.stroke();
+  }
+  boardCtx.restore();
+}
+function drawWalkingChildObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const roadY = rect.y + rect.h * 0.76;
+  const stride = Math.sin(t * 3.4);
+  const drift = Math.sin(t * 1.2) * 10;
+  const bodyX = rect.x + rect.w * 0.48 + drift;
+  const headY = rect.y + rect.h * 0.27;
+  const hipY = rect.y + rect.h * 0.56;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.strokeStyle = 'rgba(125,211,252,0.3)';
+  boardCtx.lineWidth = 14;
+  boardCtx.beginPath();
+  boardCtx.moveTo(rect.x + 20, roadY);
+  boardCtx.lineTo(rect.x + rect.w - 20, roadY);
+  boardCtx.stroke();
+  boardCtx.strokeStyle = '#f2b84b';
+  boardCtx.lineWidth = 2;
+  for(let i = 0; i < 4; i += 1){
+    const dashX = rect.x + 34 + (((i * 54) + (t * 40)) % Math.max(60, rect.w - 84));
+    boardCtx.beginPath();
+    boardCtx.moveTo(dashX, roadY);
+    boardCtx.lineTo(dashX + 24, roadY);
+    boardCtx.stroke();
+  }
+  boardCtx.strokeStyle = '#e8e8e0';
+  boardCtx.lineWidth = 4;
+  boardCtx.beginPath();
+  boardCtx.arc(bodyX, headY, 12, 0, Math.PI * 2);
+  boardCtx.stroke();
+  boardCtx.beginPath();
+  boardCtx.moveTo(bodyX, headY + 12);
+  boardCtx.lineTo(bodyX, hipY - 10);
+  boardCtx.moveTo(bodyX, headY + 24);
+  boardCtx.lineTo(bodyX - 22, headY + 36 + stride * 8);
+  boardCtx.moveTo(bodyX, headY + 24);
+  boardCtx.lineTo(bodyX + 24, headY + 34 - stride * 8);
+  boardCtx.moveTo(bodyX, hipY - 10);
+  boardCtx.lineTo(bodyX - 24, roadY - 6);
+  boardCtx.moveTo(bodyX, hipY - 10);
+  boardCtx.lineTo(bodyX + 20, roadY - 6 - stride * 10);
+  boardCtx.stroke();
+  boardCtx.strokeStyle = '#e86c2f';
+  boardCtx.lineWidth = 2.6;
+  boardCtx.beginPath();
+  boardCtx.moveTo(bodyX + 34, hipY - 22);
+  boardCtx.lineTo(bodyX + 78, hipY - 22);
+  boardCtx.stroke();
+  drawArrowHead(bodyX + 34, hipY - 22, bodyX + 78, hipY - 22, '#e86c2f');
+  boardCtx.restore();
+}
+function drawBalloonEscapeObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const driftX = Math.sin(t * 1.4) * 10;
+  const driftY = Math.sin(t * 2.2) * 8;
+  const bx = rect.x + rect.w * 0.58 + driftX;
+  const by = rect.y + rect.h * 0.28 - driftY;
+  const handX = rect.x + rect.w * 0.34;
+  const handY = rect.y + rect.h * 0.74;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.strokeStyle = '#e8e8e0';
+  boardCtx.lineWidth = 4;
+  boardCtx.beginPath();
+  boardCtx.moveTo(handX - 20, handY + 14);
+  boardCtx.lineTo(handX, handY - 12);
+  boardCtx.lineTo(handX + 10, handY - 4);
+  boardCtx.moveTo(handX, handY - 12);
+  boardCtx.lineTo(handX + 18, handY - 18);
+  boardCtx.moveTo(handX + 1, handY - 11);
+  boardCtx.lineTo(handX + 20, handY - 6);
+  boardCtx.stroke();
+  boardCtx.strokeStyle = 'rgba(242,184,75,0.7)';
+  boardCtx.setLineDash([6, 6]);
+  boardCtx.beginPath();
+  boardCtx.moveTo(handX + 12, handY - 18);
+  boardCtx.lineTo(bx - 8, by + 34);
+  boardCtx.stroke();
+  boardCtx.setLineDash([]);
+  boardCtx.fillStyle = '#e86c2f';
+  boardCtx.beginPath();
+  boardCtx.ellipse(bx, by, 26, 32, -0.08, 0, Math.PI * 2);
+  boardCtx.fill();
+  boardCtx.strokeStyle = '#f2b84b';
+  boardCtx.lineWidth = 2;
+  boardCtx.beginPath();
+  boardCtx.moveTo(bx, by + 28);
+  boardCtx.bezierCurveTo(bx - 8, by + 48, bx - 18, by + 62, bx - 14, by + 84);
+  boardCtx.stroke();
+  for(let i = 0; i < 3; i += 1){
+    const py = by + 58 - (((t * 22) + i * 18) % 46);
+    drawMonoText('o', bx + 28 + i * 4, py, 11, '#7dd3fc', alpha * 0.9, 'center');
+  }
+  boardCtx.restore();
+}
+function drawBoatRiverObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const waterY = rect.y + rect.h * 0.62;
+  const bob = Math.sin(t * 2.1) * 6;
+  const tilt = Math.sin(t * 1.8) * 0.08;
+  const boatX = rect.x + rect.w * 0.5;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.strokeStyle = '#7dd3fc';
+  boardCtx.lineWidth = 3;
+  for(let j = 0; j < 3; j += 1){
+    boardCtx.beginPath();
+    for(let i = 0; i <= 60; i += 1){
+      const x = rect.x + 16 + (i / 60) * (rect.w - 32);
+      const y = waterY + (j * 12) + Math.sin((i / 60) * 8 + t * 2.6 + j) * 6;
+      if(i === 0) boardCtx.moveTo(x, y); else boardCtx.lineTo(x, y);
+    }
+    boardCtx.stroke();
+  }
+  for(let i = 0; i < 3; i += 1){
+    const ax = rect.x + 34 + (((i * 64) + (t * 32)) % Math.max(70, rect.w - 92));
+    boardCtx.strokeStyle = '#f2b84b';
+    boardCtx.beginPath();
+    boardCtx.moveTo(ax, waterY + 38);
+    boardCtx.lineTo(ax + 28, waterY + 38);
+    boardCtx.stroke();
+    drawArrowHead(ax, waterY + 38, ax + 28, waterY + 38, '#f2b84b');
+  }
+  boardCtx.translate(boatX, waterY - 28 + bob);
+  boardCtx.rotate(tilt);
+  boardCtx.fillStyle = 'rgba(232,108,47,0.18)';
+  boardCtx.strokeStyle = '#e86c2f';
+  boardCtx.lineWidth = 3;
+  boardCtx.beginPath();
+  boardCtx.moveTo(-46, 0);
+  boardCtx.lineTo(-28, 18);
+  boardCtx.lineTo(30, 18);
+  boardCtx.lineTo(50, 0);
+  boardCtx.closePath();
+  boardCtx.fill();
+  boardCtx.stroke();
+  boardCtx.strokeStyle = '#e8e8e0';
+  boardCtx.beginPath();
+  boardCtx.moveTo(0, 0);
+  boardCtx.lineTo(0, -36);
+  boardCtx.lineTo(24, -12);
+  boardCtx.stroke();
+  boardCtx.restore();
+}
+function drawForceArrowsObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const cx = rect.x + rect.w / 2;
+  const cy = rect.y + rect.h / 2;
+  const pulse = 1 + Math.sin(t * 3.1) * 0.08;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.fillStyle = 'rgba(125,211,252,0.14)';
+  boardCtx.strokeStyle = '#e8e8e0';
+  boardCtx.lineWidth = 3;
+  boardCtx.beginPath();
+  boardCtx.roundRect(cx - 36, cy - 30, 72, 60, 12);
+  boardCtx.fill();
+  boardCtx.stroke();
+  const arrows = [
+    { x1: cx - 92, y1: cy, x2: cx - 42, y2: cy, c:'#e86c2f', len:1.18 },
+    { x1: cx + 42, y1: cy, x2: cx + 92, y2: cy, c:'#7dd3fc', len:0.92 },
+    { x1: cx, y1: cy + 76, x2: cx, y2: cy + 28, c:'#f2b84b', len:1.08 },
+    { x1: cx, y1: cy - 28, x2: cx, y2: cy - 88, c:'#e8e8e0', len:0.96 }
+  ];
+  arrows.forEach((arrow, idx) => {
+    const scale = arrow.len + (idx === 0 ? Math.sin(t * 2.8) * 0.08 : Math.cos(t * 2 + idx) * 0.04);
+    const ex = mix(cx, arrow.x2, scale / pulse);
+    const ey = mix(cy, arrow.y2, scale / pulse);
+    boardCtx.strokeStyle = arrow.c;
+    boardCtx.lineWidth = 4;
+    boardCtx.beginPath();
+    boardCtx.moveTo(arrow.x1, arrow.y1);
+    boardCtx.lineTo(ex, ey);
+    boardCtx.stroke();
+    drawArrowHead(arrow.x1, arrow.y1, ex, ey, arrow.c);
+  });
+  boardCtx.strokeStyle = 'rgba(242,184,75,0.75)';
+  boardCtx.setLineDash([6, 6]);
+  boardCtx.beginPath();
+  boardCtx.moveTo(cx, cy);
+  boardCtx.lineTo(cx + 82, cy - 20);
+  boardCtx.stroke();
+  boardCtx.setLineDash([]);
+  drawArrowHead(cx, cy, cx + 82, cy - 20, '#f2b84b');
+  boardCtx.restore();
+}
+function drawSpringMassObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const wallX = rect.x + 34;
+  const midY = rect.y + rect.h * 0.54;
+  const extension = Math.sin(t * 2.5) * 18;
+  const massX = rect.x + rect.w * 0.68 + extension;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.strokeStyle = '#e8e8e0';
+  boardCtx.lineWidth = 5;
+  boardCtx.beginPath();
+  boardCtx.moveTo(wallX, rect.y + 28);
+  boardCtx.lineTo(wallX, rect.y + rect.h - 28);
+  boardCtx.stroke();
+  boardCtx.strokeStyle = '#7dd3fc';
+  boardCtx.lineWidth = 3;
+  boardCtx.beginPath();
+  boardCtx.moveTo(wallX, midY);
+  const coils = 9;
+  for(let i = 1; i <= coils; i += 1){
+    const x = mix(wallX, massX - 34, i / coils);
+    const y = midY + (i % 2 ? -14 : 14);
+    boardCtx.lineTo(x, y);
+  }
+  boardCtx.lineTo(massX - 14, midY);
+  boardCtx.stroke();
+  boardCtx.strokeStyle = 'rgba(242,184,75,0.7)';
+  boardCtx.setLineDash([6, 6]);
+  boardCtx.beginPath();
+  boardCtx.moveTo(rect.x + rect.w * 0.68, rect.y + 28);
+  boardCtx.lineTo(rect.x + rect.w * 0.68, rect.y + rect.h - 28);
+  boardCtx.stroke();
+  boardCtx.setLineDash([]);
+  boardCtx.fillStyle = 'rgba(232,108,47,0.16)';
+  boardCtx.strokeStyle = '#e86c2f';
+  boardCtx.lineWidth = 3;
+  boardCtx.beginPath();
+  boardCtx.roundRect(massX - 14, midY - 28, 54, 56, 10);
+  boardCtx.fill();
+  boardCtx.stroke();
+  boardCtx.restore();
+}
+function drawPendulumObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const pivotX = rect.x + rect.w / 2;
+  const pivotY = rect.y + 30;
+  const angle = Math.sin(t * 1.8) * 0.82;
+  const length = rect.h * 0.5;
+  const bx = pivotX + Math.sin(angle) * length;
+  const by = pivotY + Math.cos(angle) * length;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.strokeStyle = 'rgba(125,211,252,0.22)';
+  boardCtx.lineWidth = 2;
+  boardCtx.beginPath();
+  boardCtx.arc(pivotX, pivotY, length, Math.PI * 0.18, Math.PI * 0.82);
+  boardCtx.stroke();
+  boardCtx.strokeStyle = '#e8e8e0';
+  boardCtx.lineWidth = 4;
+  boardCtx.beginPath();
+  boardCtx.moveTo(pivotX - 42, pivotY);
+  boardCtx.lineTo(pivotX + 42, pivotY);
+  boardCtx.moveTo(pivotX, pivotY);
+  boardCtx.lineTo(bx, by);
+  boardCtx.stroke();
+  boardCtx.fillStyle = '#e86c2f';
+  boardCtx.beginPath();
+  boardCtx.arc(bx, by, 18, 0, Math.PI * 2);
+  boardCtx.fill();
+  boardCtx.restore();
+}
+function drawPlanetOrbitObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const cx = rect.x + rect.w / 2;
+  const cy = rect.y + rect.h / 2;
+  const rx = rect.w * 0.28;
+  const ry = rect.h * 0.2;
+  const angle = t * 0.75;
+  const px = cx + Math.cos(angle) * rx;
+  const py = cy + Math.sin(angle) * ry;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.strokeStyle = 'rgba(125,211,252,0.4)';
+  boardCtx.lineWidth = 2.2;
+  boardCtx.beginPath();
+  boardCtx.ellipse(cx, cy, rx, ry, -0.18, 0, Math.PI * 2);
+  boardCtx.stroke();
+  boardCtx.fillStyle = '#f2b84b';
+  boardCtx.beginPath();
+  boardCtx.arc(cx, cy, 18, 0, Math.PI * 2);
+  boardCtx.fill();
+  boardCtx.fillStyle = '#7dd3fc';
+  boardCtx.beginPath();
+  boardCtx.arc(px, py, 8, 0, Math.PI * 2);
+  boardCtx.fill();
+  boardCtx.strokeStyle = 'rgba(232,108,47,0.45)';
+  boardCtx.beginPath();
+  boardCtx.moveTo(cx, cy);
+  boardCtx.lineTo(px, py);
+  boardCtx.stroke();
+  boardCtx.restore();
+}
+function drawMagnetFieldObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const cx = rect.x + rect.w / 2;
+  const cy = rect.y + rect.h * 0.58;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.fillStyle = 'rgba(232,108,47,0.16)';
+  boardCtx.strokeStyle = '#e8e8e0';
+  boardCtx.lineWidth = 2.8;
+  boardCtx.beginPath();
+  boardCtx.roundRect(cx - 64, cy - 20, 128, 40, 12);
+  boardCtx.fill();
+  boardCtx.stroke();
+  boardCtx.fillStyle = '#7dd3fc';
+  boardCtx.fillRect(cx - 64, cy - 20, 64, 40);
+  boardCtx.fillStyle = '#e86c2f';
+  boardCtx.fillRect(cx, cy - 20, 64, 40);
+  drawMonoText('N', cx - 32, cy + 6, 14, '#081018', alpha, 'center');
+  drawMonoText('S', cx + 32, cy + 6, 14, '#081018', alpha, 'center');
+  boardCtx.strokeStyle = 'rgba(242,184,75,0.62)';
+  boardCtx.lineWidth = 2;
+  for(let i = 0; i < 4; i += 1){
+    const offset = i * 16;
+    boardCtx.beginPath();
+    boardCtx.moveTo(cx - 52, cy - 20 - offset);
+    boardCtx.bezierCurveTo(cx - 28, cy - 74 - offset, cx + 28, cy - 74 - offset, cx + 52, cy - 20 - offset);
+    boardCtx.stroke();
+    boardCtx.beginPath();
+    boardCtx.moveTo(cx + 52, cy + 20 + offset);
+    boardCtx.bezierCurveTo(cx + 28, cy + 74 + offset, cx - 28, cy + 74 + offset, cx - 52, cy + 20 + offset);
+    boardCtx.stroke();
+  }
+  const sparkX = cx - 8 + Math.sin(t * 2.4) * 40;
+  drawMonoText('o', sparkX, cy - 76, 12, '#f2b84b', alpha * 0.95, 'center');
+  boardCtx.restore();
+}
+function drawTriangleObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const a = { x: rect.x + 26, y: rect.y + rect.h - 22 };
+  const b = { x: rect.x + rect.w * 0.44, y: rect.y + 26 };
+  const c = { x: rect.x + rect.w - 24, y: rect.y + rect.h - 28 };
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.fillStyle = 'rgba(125,211,252,0.08)';
+  boardCtx.strokeStyle = '#e86c2f';
+  boardCtx.lineWidth = 3;
+  boardCtx.beginPath();
+  boardCtx.moveTo(a.x, a.y); boardCtx.lineTo(b.x, b.y); boardCtx.lineTo(c.x, c.y); boardCtx.closePath();
+  boardCtx.fill(); boardCtx.stroke();
+  boardCtx.strokeStyle = '#7dd3fc';
+  boardCtx.lineWidth = 2;
+  boardCtx.beginPath();
+  boardCtx.arc(a.x + 22, a.y - 3, 14 + Math.sin(t * 2) * 2, -Math.PI/2, -0.2);
+  boardCtx.stroke();
+  boardCtx.restore();
+}
+function drawProcessChainObject(rect, focus, alpha, t){
+  drawSceneCard(rect, focus, alpha);
+  const steps = ['Input', 'Transform', 'Meaning'];
+  const active = Math.floor(t * 1.4) % steps.length;
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  for(let i = 0; i < steps.length; i += 1){
+    const x = rect.x + 20 + i * ((rect.w - 60) / 2);
+    const y = rect.y + rect.h * 0.4;
+    boardCtx.fillStyle = i === active ? 'rgba(242,184,75,0.16)' : 'rgba(232,108,47,0.06)';
+    boardCtx.strokeStyle = i === active ? '#f2b84b' : '#e86c2f';
+    boardCtx.lineWidth = 2.2;
+    boardCtx.beginPath();
+    boardCtx.roundRect(x, y, 74, 42, 10);
+    boardCtx.fill();
+    boardCtx.stroke();
+    drawMonoText(steps[i], x + 37, y + 26, 13, '#e8e8e0', alpha, 'center');
+    if(i < steps.length - 1){
+      boardCtx.strokeStyle = '#7dd3fc';
+      boardCtx.beginPath();
+      boardCtx.moveTo(x + 74, y + 21);
+      boardCtx.lineTo(x + 102, y + 21);
+      boardCtx.stroke();
+      drawArrowHead(x + 74, y + 21, x + 102, y + 21, '#7dd3fc');
+    }
+  }
+  boardCtx.restore();
+}
+function drawNoteCardObject(rect, focus, alpha, label, detail){
+  drawSceneCard(rect, focus, alpha);
+  drawChalkText(label || 'Key idea', rect.x + 14, rect.y + 28, 22, '#e8e8e0', alpha);
+  wrapText(detail || '', rect.x + 14, rect.y + 58, rect.w - 28, 20, 'rgba(232,232,224,0.88)');
+}
+function drawSceneObject(obj, rect, focus, reveal, t){
+  if(reveal <= 0) return;
+  const eased = easeOutCubic(reveal);
+  const alpha = focus ? eased : eased * 0.74;
+  const pulse = focus ? 1 + (Math.sin(t * 3.2) * 0.008) : 1;
+  const targetScale = focus ? 0.93 : 0.89;
+  const animatedRect = scaledRect(rect, mix(0.84, targetScale * pulse, eased), (1 - eased) * 12);
+  if(obj.kind === 'atom') drawAtomObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'blood_flow') drawBloodFlowObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'lungs') drawLungsObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'neural_net') drawNeuralNetObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'matrix') drawMatrixObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'cartesian_plane') drawCartesianPlaneObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'wave') drawWaveObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'vector_axes') drawVectorAxesObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'beaker') drawBeakerObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'walking_child') drawWalkingChildObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'balloon_escape') drawBalloonEscapeObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'boat_river') drawBoatRiverObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'force_arrows') drawForceArrowsObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'spring_mass') drawSpringMassObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'pendulum') drawPendulumObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'planet_orbit') drawPlanetOrbitObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'magnet_field') drawMagnetFieldObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'triangle') drawTriangleObject(animatedRect, focus, alpha, t);
+  else if(obj.kind === 'process_chain') drawProcessChainObject(animatedRect, focus, alpha, t);
+  else drawNoteCardObject(animatedRect, focus, alpha, obj.label, obj.detail);
+  if(obj.kind !== 'note_card'){
+    drawCaptionShield(animatedRect, alpha * 0.92);
+    drawObjectCaption(animatedRect, obj.label, obj.detail, alpha);
+  }
+}
+function drawSceneConnector(connector, objectRects, activeIds, alpha = 1){
+  const fromRect = objectRects[connector.from];
+  const toRect = objectRects[connector.to];
+  if(!fromRect || !toRect) return;
+  const path = connectorPoints(fromRect, toRect);
+  const highlight = activeIds.has(connector.from) || activeIds.has(connector.to);
+  boardCtx.save();
+  boardCtx.globalAlpha = alpha;
+  boardCtx.strokeStyle = highlight ? '#f2b84b' : 'rgba(125,211,252,0.45)';
+  boardCtx.lineWidth = highlight ? 2.6 : 1.6;
+  boardCtx.beginPath();
+  boardCtx.moveTo(path.fx, path.fy);
+  boardCtx.bezierCurveTo(path.c1x, path.c1y, path.c2x, path.c2y, path.tx, path.ty);
+  boardCtx.stroke();
+  drawArrowHead(path.c2x, path.c2y, path.tx, path.ty, highlight ? '#f2b84b' : '#7dd3fc');
+  const mid = bezierPoint(
+    { x:path.fx, y:path.fy },
+    { x:path.c1x, y:path.c1y },
+    { x:path.c2x, y:path.c2y },
+    { x:path.tx, y:path.ty },
+    0.5
+  );
+  const label = connector.label || '';
+  boardCtx.font = '11px IBM Plex Mono';
+  const pillW = clamp(boardCtx.measureText(label).width + 22, 72, 168);
+  boardCtx.fillStyle = 'rgba(7,11,16,0.76)';
+  boardCtx.strokeStyle = highlight ? 'rgba(242,184,75,0.62)' : 'rgba(125,211,252,0.2)';
+  boardCtx.lineWidth = 1;
+  boardCtx.beginPath();
+  boardCtx.roundRect(mid.x - (pillW / 2), mid.y - 20, pillW, 18, 9);
+  boardCtx.fill();
+  boardCtx.stroke();
+  drawMonoText(label, mid.x, mid.y - 7, 11, highlight ? '#f2b84b' : '#7dd3fc', alpha, 'center');
+  boardCtx.restore();
+}
+function drawSemanticScene(payload, progress = 0){
+  activateLayer('whiteboard');
+  clearCanvas();
+  clearAssetLayer();
+  const { w, h } = boardMetrics();
+  const t = performance.now() * 0.001;
+  const activeBeat = findActiveBeat(payload, progress);
+  const activeIds = new Set((activeBeat && activeBeat.focus) || []);
+
+  drawBoardBackdrop(w, h, t, progress);
+
+  drawChalkText(payload.title || 'Lesson board', 62, 56, 28, '#e8e8e0', 1);
+  drawMonoText(payload.subtitle || '', 62, 84, 13, '#7dd3fc', 0.92);
+  drawBeatTrack(payload, progress, w);
+  boardCtx.save();
+  boardCtx.strokeStyle = 'rgba(232,108,47,0.7)';
+  boardCtx.lineWidth = 2;
+  boardCtx.beginPath();
+  boardCtx.moveTo(60, 94);
+  boardCtx.lineTo(w - 56, 94);
+  boardCtx.stroke();
+  boardCtx.restore();
+
+  const objectRects = {};
+  const objects = (payload && payload.objects) || [];
+  for(const obj of objects){
+    objectRects[obj.id] = getSlotRect(obj.slot, w, h);
+  }
+  for(const connector of (payload.connectors || [])){
+    const fromReveal = revealProgressForObject(payload, connector.from, progress);
+    const toReveal = revealProgressForObject(payload, connector.to, progress);
+    if(fromReveal > 0.4 && toReveal > 0.4){
+      drawSceneConnector(connector, objectRects, activeIds, Math.min(fromReveal, toReveal));
+    }
+  }
+  for(const obj of objects){
+    drawSceneObject(obj, objectRects[obj.id], activeIds.has(obj.id), revealProgressForObject(payload, obj.id, progress), t);
+  }
+  if(activeBeat && activeBeat.caption){
+    const footer = { x: 56, y: h - 78, w: w - 112, h: 48 };
+    drawSceneCard(footer, true, 0.95);
+    drawMonoText('current idea', footer.x + 18, footer.y + 18, 11, '#f2b84b', 0.95);
+    drawChalkText(activeBeat.caption, footer.x + 18, footer.y + 34, 17, '#e8e8e0', 1);
+  }
+}
+function drawWhiteboard(payload, progress = 0){
+  if(payload && payload.style === 'semantic_scene'){
+    syncBoardAssets(payload.assets || []);
+    drawSemanticScene(payload, progress);
+    return;
+  }
+  activateLayer('whiteboard');
+  clearCanvas();
+  syncBoardAssets((payload && payload.assets) || []);
+  const elements = (payload && payload.elements) || [];
+  for(const el of elements){
+    if(el.kind === 'text' || el.kind === 'equation'){
+      boardCtx.save();
+      boardCtx.fillStyle = el.kind === 'equation' ? '#7dd3fc' : '#e8e8e0';
+      boardCtx.font = `${el.size || 26}px ${el.kind === 'equation' ? 'IBM Plex Mono' : 'IBM Plex Sans'}`;
+      boardCtx.fillText(el.text || '', el.x || 60, el.y || 60);
+      boardCtx.restore();
+    } else if(el.kind === 'box' || el.kind === 'note'){
+      const x = el.x || 60, y = el.y || 90, w = el.w || 220, h = el.h || 90;
+      roughCanvas.rectangle(x, y, w, h, { stroke:'#e86c2f', strokeWidth:2, roughness:1.18, fill: el.kind === 'note' ? 'rgba(125,211,252,0.08)' : 'rgba(232,108,47,0.08)', fillStyle:'solid' });
+      wrapText(el.text || '', x + 16, y + 28, w - 28, 18, el.kind === 'note' ? '#d9e5f2' : '#e8e8e0');
+    } else if(el.kind === 'arrow'){
+      const [x1, y1] = el.from || [100, 100];
+      const [x2, y2] = el.to || [220, 100];
+      roughCanvas.line(x1, y1, x2, y2, { stroke:'#e86c2f', strokeWidth:2, roughness:1.1 });
+      drawArrowHead(x1, y1, x2, y2, '#e86c2f');
+      if(el.label){ drawMonoText(el.label, (x1 + x2) / 2, (y1 + y2) / 2 - 8, 15, '#e86c2f', 1, 'center'); }
+    } else if(el.kind === 'line'){
+      const [x1, y1] = el.from || [60, 220];
+      const [x2, y2] = el.to || [700, 220];
+      roughCanvas.line(x1, y1, x2, y2, { stroke:'#7dd3fc', strokeWidth:1.8, roughness:1.2 });
+    } else if(el.kind === 'underline'){
+      const x = el.x || 60;
+      const y = el.y || 80;
+      const w = el.w || 220;
+      roughCanvas.line(x, y, x + w, y, { stroke:'#e86c2f', strokeWidth:2.1, roughness:1.4 });
+    } else if(el.kind === 'ellipse'){
+      const x = el.x || 420, y = el.y || 400, w = el.w || 120, h = el.h || 52;
+      roughCanvas.ellipse(x + (w / 2), y + (h / 2), w, h, { stroke:'#e86c2f', strokeWidth:2, roughness:1.2, fill:'rgba(232,108,47,0.08)', fillStyle:'solid' });
+      wrapText(el.text || '', x + 18, y + 30, w - 28, 18, '#e8e8e0');
+    } else if(el.kind === 'bullet_list'){
+      drawBulletList(el.x || 70, el.y || 280, el.items || [], el.w || 280, '#e8e8e0');
+    }
+  }
+}
+async function renderMermaid(code){
+  activateLayer('mermaid');
+  const host = qs('mermaidHost');
+  host.innerHTML = `<div class="mermaid">${code}</div>`;
+  try{ await mermaid.run({ nodes:[host.querySelector('.mermaid')] }); }
+  catch(err){ host.innerHTML = '<div style="color:#aaa;font-family:monospace">Mermaid render failed</div>'; console.error(err); }
+}
+function renderChart(config){
+  activateLayer('chartjs');
+  const ctx = qs('chartCanvas').getContext('2d');
+  if(currentChart){ try{ currentChart.destroy(); }catch{} }
+  currentChart = new Chart(ctx, config);
+}
+function manimMediaUrl(payload){
+  const data = payload || {};
+  return toUrl(
+    data.media_url ||
+    data.video_url ||
+    data.public_url ||
+    data.url ||
+    (data.payload && (data.payload.media_url || data.payload.video_url || data.payload.public_url)) ||
+    (data.render_output && (data.render_output.media_url || data.render_output.video_url || data.render_output.public_url)) ||
+    ''
+  );
+}
+async function renderManim(payload){
+  activateLayer('manim');
+  const video = qs('manimVideo');
+  const src = manimMediaUrl(payload);
+  if(!src){ showLoader(false); return; }
+  video.onerror = () => {
+    console.error('[manim] video failed to load', {src});
+    showLoader(false);
+  };
+  video.oncanplay = () => showLoader(false);
+  if(video.dataset.src !== src){
+    video.dataset.src = src;
+    video.src = src;
+    video.load();
+  }
+  showLoader(false);
+}
+function syncManimSegment(seg, progress = 0){
+  const payload = (seg || {}).payload || {};
+  const video = qs('manimVideo');
+  const src = manimMediaUrl(payload);
+  if(!src) return;
+  if(video.dataset.src !== src){
+    void renderManim(payload);
+    return;
+  }
+  if(video.readyState >= 1 && isFinite(video.duration) && video.duration > 0){
+    const target = Math.max(0, Math.min(video.duration - 0.05, progress * video.duration));
+    if(Math.abs((video.currentTime || 0) - target) > 0.25){
+      try{ video.currentTime = target; }catch{}
+    }
+    if(video.paused) video.play().catch(() => null);
+  }
+}
+function renderTimelinePills(segments){ const bar = qs('timelineBar'); bar.innerHTML = ''; for(const seg of segments || []){ const btn = document.createElement('button'); btn.className = 'seg-pill'; btn.id = `pill_${seg.id}`; btn.textContent = `${seg.kind} - ${seg.title}`; btn.onclick = () => renderSegment(seg); bar.appendChild(btn); } }
+function markActiveSegment(segId){ document.querySelectorAll('.seg-pill').forEach((el) => el.classList.remove('active')); const pill = qs(`pill_${segId}`); if(pill) pill.classList.add('active'); }
+async function renderSegment(seg, progress = 0){
+  if(!seg) return;
+  currentSegmentId = seg.id;
+  markActiveSegment(seg.id);
+  if(seg.kind === 'mermaid') await renderMermaid((seg.payload || {}).code || 'flowchart TD\nA[No diagram]');
+  else if(seg.kind === 'chartjs') renderChart((seg.payload || {}).config || { type:'bar', data:{ labels:['A'], datasets:[{ data:[1] }] } });
+  else if(seg.kind === 'manim') await renderManim(seg.payload || {});
+  else drawWhiteboard(seg.payload || {}, progress);
+  showLoader(false);
+}
+function resetVisualState(payload){ currentVisualPayload = payload || { segments:[] }; currentSegmentId = null; renderTimelinePills(currentVisualPayload.segments || []); clearLayers(); }
+function driveVisualsWithAudio(audio, payload){
+  resetVisualState(payload);
+  if(!(payload && payload.segments && payload.segments.length)){ showLoader(false); return; }
+  showLoader(true);
+  cancelAnimationFrame(boardAnimationFrame);
+  const tick = async () => {
+    if(!audio || !audio.duration || !isFinite(audio.duration)){ boardAnimationFrame = requestAnimationFrame(tick); return; }
+    const progress = Math.max(0, Math.min(1, audio.currentTime / audio.duration));
+    let target = null;
+    for(const seg of payload.segments){
+      if(progress >= (seg.start_pct || 0) && progress <= (seg.end_pct || 1) + 0.02){ target = seg; break; }
+    }
+    if(!target && progress >= 0.99) target = payload.segments[payload.segments.length - 1];
+    if(target){
+      if(currentSegmentId !== target.id) await renderSegment(target, progress);
+      if(isStaticBoardKind(target.kind)) drawWhiteboard(target.payload || {}, progress);
+      else if(target.kind === 'manim') syncManimSegment(target, progress);
+    }
+    if(!audio.paused && !audio.ended) boardAnimationFrame = requestAnimationFrame(tick);
+  };
+  boardAnimationFrame = requestAnimationFrame(tick);
+}
+function getPlaybackSegment(payload, segmentId){
+  return ((payload && payload.segments) || []).find((item) => item.id === segmentId) || null;
+}
+function driveSingleSegmentWithAudio(audio, seg){
+  cancelAnimationFrame(boardAnimationFrame);
+  const tick = async () => {
+    if(!audio || !audio.duration || !isFinite(audio.duration)){ boardAnimationFrame = requestAnimationFrame(tick); return; }
+    const progress = Math.max(0, Math.min(1, audio.currentTime / audio.duration));
+    if(currentSegmentId !== seg.id) await renderSegment(seg, progress);
+    if(isStaticBoardKind(seg.kind)) drawWhiteboard(seg.payload || {}, progress);
+    else if(seg.kind === 'manim') syncManimSegment(seg, progress);
+    if(!audio.paused && !audio.ended) boardAnimationFrame = requestAnimationFrame(tick);
+  };
+  boardAnimationFrame = requestAnimationFrame(tick);
+}
+function replayPlayback(plan){
+  if(!plan) return;
+  stopAudio();
+  if(plan.type === 'sequence') void playSegmentSequence(plan.audioSegments || [], plan.visualPayload || null, false);
+  else void playBlob(plan.audioUrl || '', plan.visualPayload || null, false);
+}
+window.replayVisuals = () => { if(lastAnswerPlayback) replayPlayback(lastAnswerPlayback); };
+function fitBoard(){ initWhiteboard(); if(currentSegmentId && currentVisualPayload){ const seg = (currentVisualPayload.segments || []).find((item) => item.id === currentSegmentId); if(seg) void renderSegment(seg); } }
+function clearBoard(){ clearLayers(); qs('notesView').innerHTML = ''; qs('timelineBar').innerHTML = ''; qs('clipBar').classList.remove('visible'); clipTime = null; }
+window.fitBoard = fitBoard;
+window.clearBoard = clearBoard;
+
+window.showClip = (ts) => {
+  clipTime = Number(ts || 0);
+  const thumb = qs('clipThumb');
+  thumb.src = `${API}/video/${VID_ID}`;
+  thumb.currentTime = clipTime;
+  qs('clipTs').textContent = `at ${fmt(clipTime)} in the video`;
+  qs('clipBar').classList.add('visible');
+};
+window.jumpToClip = () => { if(clipTime === null){ jumpToPlayer(); return; } location.href = `/player?id=${encodeURIComponent(VID_ID)}&t=${Math.floor(clipTime)}`; };
+
+async function setupAnalyser(audio){
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') await audioCtx.resume();
+    if(sourceNode) sourceNode.disconnect();
+    sourceNode = audioCtx.createMediaElementSource(audio);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    sourceNode.connect(analyser);
+    analyser.connect(audioCtx.destination);
+  }catch(err){ analyser = null; }
+}
+async function playBlob(url, visualPayload = null, remember = true){
+  return new Promise(async (resolve) => {
+    const localToken = ++playbackToken;
+    try{
+      if(!url){ if(visualPayload) resetVisualState(visualPayload); resolve(); return; }
+      const resp = await fetch(toUrl(url));
+      if(!resp.ok){ resolve(); return; }
+      const ourl = URL.createObjectURL(await resp.blob());
+      const audio = new Audio(ourl);
+      curAudio = audio;
+      if(remember) lastAnswerPlayback = { type:'single', audioUrl:url, visualPayload };
+      audio.onloadedmetadata = () => { if(visualPayload) driveVisualsWithAudio(audio, visualPayload); else showLoader(false); };
+      audio.onended = () => { cancelAnimationFrame(boardAnimationFrame); URL.revokeObjectURL(ourl); if(curAudio === audio) curAudio = null; resolve(); };
+      audio.onerror = () => { cancelAnimationFrame(boardAnimationFrame); URL.revokeObjectURL(ourl); if(curAudio === audio) curAudio = null; resolve(); };
+      await setupAnalyser(audio);
+      if(localToken !== playbackToken){ URL.revokeObjectURL(ourl); resolve(); return; }
+      await audio.play();
+    }catch(err){ console.error(err); resolve(); }
+  });
+}
+async function playSegmentSequence(audioSegments, visualPayload = null, remember = true){
+  const list = Array.isArray(audioSegments) ? audioSegments.filter((item) => item && item.audio_url) : [];
+  const localToken = ++playbackToken;
+  if(remember) lastAnswerPlayback = { type:'sequence', audioSegments:list, visualPayload };
+  if(visualPayload) resetVisualState(visualPayload);
+  if(!list.length){ showLoader(false); return; }
+  showLoader(true);
+  for(const item of list){
+    if(localToken !== playbackToken) return;
+    try{
+      const seg = getPlaybackSegment(visualPayload, item.segment_id);
+      if(seg) await renderSegment(seg, 0);
+      const resp = await fetch(toUrl(item.audio_url));
+      if(!resp.ok) continue;
+      const ourl = URL.createObjectURL(await resp.blob());
+      const audio = new Audio(ourl);
+      curAudio = audio;
+      await setupAnalyser(audio);
+      await new Promise((resolve) => {
+        audio.onloadedmetadata = async () => {
+          if(seg) driveSingleSegmentWithAudio(audio, seg);
+          else showLoader(false);
+          try{ await audio.play(); }catch{ resolve(); }
+        };
+        audio.onended = () => {
+          cancelAnimationFrame(boardAnimationFrame);
+          URL.revokeObjectURL(ourl);
+          if(curAudio === audio) curAudio = null;
+          resolve();
+        };
+        audio.onerror = () => {
+          cancelAnimationFrame(boardAnimationFrame);
+          URL.revokeObjectURL(ourl);
+          if(curAudio === audio) curAudio = null;
+          resolve();
+        };
+      });
+    }catch(err){
+      console.error(err);
+    }
+  }
+  showLoader(false);
+}
+function upsertVisualSegment(seg){
+  if(!seg) return;
+  if(!currentVisualPayload || !Array.isArray(currentVisualPayload.segments)) currentVisualPayload = { segments:[] };
+  const existing = currentVisualPayload.segments.findIndex((item) => item && item.id === seg.id);
+  if(existing >= 0) currentVisualPayload.segments[existing] = seg;
+  else currentVisualPayload.segments.push(seg);
+  currentVisualPayload.segments.sort((a, b) => Number(a.frame_number || 0) - Number(b.frame_number || 0));
+  renderTimelinePills(currentVisualPayload.segments || []);
+}
+async function playFetchedSegment(item, seg){
+  if(!item || !item.audio_url) return;
+  const localToken = ++playbackToken;
+  try{
+    if(seg) await renderSegment(seg, 0);
+    const resp = await fetch(toUrl(item.audio_url));
+    if(!resp.ok) return;
+    const ourl = URL.createObjectURL(await resp.blob());
+    const audio = new Audio(ourl);
+    curAudio = audio;
+    await setupAnalyser(audio);
+    await new Promise((resolve) => {
+      audio.onloadedmetadata = async () => {
+        if(seg) driveSingleSegmentWithAudio(audio, seg);
+        else showLoader(false);
+        try{ if(localToken === playbackToken) await audio.play(); else resolve(); }
+        catch{ resolve(); }
+      };
+      audio.onended = () => {
+        cancelAnimationFrame(boardAnimationFrame);
+        URL.revokeObjectURL(ourl);
+        if(curAudio === audio) curAudio = null;
+        resolve();
+      };
+      audio.onerror = () => {
+        cancelAnimationFrame(boardAnimationFrame);
+        URL.revokeObjectURL(ourl);
+        if(curAudio === audio) curAudio = null;
+        resolve();
+      };
+    });
+  }catch(err){
+    console.error(err);
+  }
+}
+async function kickStreamPlayback(){
+  if(streamPlaybackRunning) return;
+  const localRunToken = streamRunToken;
+  streamPlaybackRunning = true;
+  while(true){
+    if(localRunToken !== streamRunToken) break;
+    if(!streamBridgeDone){ await sleep(80); continue; }
+    const next = streamQueue.shift();
+    if(next){
+      if(next.visual_segment) upsertVisualSegment(next.visual_segment);
+      streamCollectedAudio.push(next.audio_segment);
+      await playFetchedSegment(next.audio_segment, next.visual_segment || null);
+      continue;
+    }
+    if(streamDone && !streamPendingAudio.size && !readyAudioSegments.size) break;
+    await sleep(80);
+  }
+  streamPlaybackRunning = false;
+  if(localRunToken === streamRunToken && streamDone){
+    showLoader(false);
+    if(streamCollectedAudio.length && currentVisualPayload){
+      lastAnswerPlayback = { type:'sequence', audioSegments:streamCollectedAudio.slice(), visualPayload:currentVisualPayload };
+    }
+  }
+}
+function stopAudio(){
+  streamRunToken += 1;
+  playbackToken += 1;
+  if(curAudio){ try{ curAudio.pause(); curAudio.src = ''; }catch{} curAudio = null; }
+  cancelAnimationFrame(boardAnimationFrame);
+  streamQueue = [];
+  streamPendingAudio.clear();
+  readyAudioSegments.clear();
+  streamPlaybackRunning = false;
+}
+async function playClipBridge(bridge){
+  return new Promise((resolve) => {
+    if(!bridge){ resolve(); return; }
+    const overlay = qs('videoOverlay');
+    const video = qs('clipVideo');
+    const start = Math.max(0, Number(bridge.start_sec || bridge.timestamp || 0));
+    const end = Math.max(start + 1, Number(bridge.end_sec || start + 8));
+    clipTime = start;
+    qs('clipLabel').textContent = bridge.label || 'Relevant source moment';
+    qs('clipNarration').textContent = bridge.intro_text || bridge.source_excerpt || 'First the source moment, then the blackboard explanation.';
+    qs('clipTs').textContent = `at ${fmt(start)} in the video`;
+    qs('clipBar').classList.add('visible');
+    qs('clipThumb').src = `${API}/video/${VID_ID}`;
+    qs('clipThumb').currentTime = start;
+    video.muted = false;
+    video.volume = 1;
+    overlay.classList.remove('closing');
+    overlay.classList.add('show');
+    let done = false;
+    const cleanup = () => {
+      if(done) return;
+      done = true;
+      clearInterval(clipInterval);
+      clipInterval = null;
+      try{ video.pause(); }catch{}
+      overlay.classList.add('closing');
+      setTimeout(() => { overlay.classList.remove('show', 'closing'); resolve(); }, 380);
+    };
+    const begin = async () => {
+      try{ video.currentTime = start; }catch{}
+      try{ await video.play(); }catch{}
+      clipInterval = setInterval(() => { if(video.currentTime >= end) cleanup(); }, 140);
+      setTimeout(cleanup, Math.max(3200, (end - start) * 1000 + 900));
+    };
+    if(video.dataset.videoId !== VID_ID){
+      video.src = `${API}/video/${VID_ID}`;
+      video.dataset.videoId = VID_ID;
+      video.addEventListener('loadedmetadata', begin, { once:true });
+    } else if(video.readyState >= 1){ begin(); }
+    else { video.addEventListener('loadedmetadata', begin, { once:true }); }
+  });
+}
+
+async function greetSession(){
+  showLoader(true);
+  setPipelineDebug(null);
+  try{
+    const fd = new FormData();
+    fd.append('video_id', VID_ID);
+    fd.append('sid', SID);
+    fd.append('use_video_context', useVideoContext ? '1' : '0');
+    fd.append('preferred_visualization', preferredVisualization);
+    const res = await fetch(`${API}/greet`, { method:'POST', body:fd });
+    const data = await res.json();
+    if(data.already_greeted){ setAState('ready', 'Press start once. The loop will keep running until you stop it.'); showLoader(false); return; }
+    addAIMsg(data.greeting || data.text || 'Welcome to the lesson.', null, null, data.suggestions || []);
+    renderBoardActions(data.board_actions || []);
+    setAState('greeting', 'The lesson is greeting you now.');
+    setVoiceHint('The session is ready. Press start once to arm the continuous voice loop.');
+    await playBlob(data.audio_url, data.visual_payload || null, false);
+  }catch(err){ console.error(err); smsg('greeting failed'); }
+  showLoader(false);
+  setAState('ready', 'Press start once. The loop will keep running until you stop it.');
+}
+
+async function doChatFallback(question, fd){
+  const res = await fetch(`${API}/chat`, { method:'POST', body:fd });
+  const data = await res.json();
+  if(!res.ok){ smsg(data.detail || data.error || 'error'); showLoader(false); return; }
+  setPipelineDebug(data.pipeline_debug || null);
+  addAIMsg(data.answer || '', data.timestamp, data.source, data.suggestions || []);
+  if(data.follow_up) addFollowUp(data.follow_up);
+  renderBoardActions(data.board_actions || []);
+  if(data.timestamp !== null && data.timestamp !== undefined) showClip(data.timestamp);
+  const bridge = data.reference_bridge || (data.timestamp !== null && data.timestamp !== undefined ? { start_sec:data.timestamp, end_sec:Number(data.timestamp) + 8, label:'Relevant source moment', intro_text:'I will show you the relevant moment in the video first. When it ends, I will break it down on the board.' } : null);
+  currentBridge = bridge;
+  setAState('answering', bridge ? 'Introducing the clip first, then I will answer.' : 'Answering now.');
+  if(bridge && useVideoContext){
+    if(bridge.intro_audio_url){
+      await playBlob(bridge.intro_audio_url, null, false);
+    }
+    setAState('watching', 'Playing the relevant video moment with its original audio.');
+    await playClipBridge(bridge);
+    setAState('answering', 'Now I am breaking the clip down for you.');
+  }
+  if(data.audio_segments && data.audio_segments.length){
+    await playSegmentSequence(data.audio_segments, data.visual_payload || null, true);
+  } else {
+    await playBlob(data.audio_url, data.visual_payload || null, true);
+  }
+}
+async function doChat(question){
+  if(chatBusy) return;
+  chatBusy = true;
+  showLoader(true);
+  setPipelineDebug(null);
+  stopAudio();
+  streamQueue = [];
+  streamCollectedAudio = [];
+  streamPlaybackRunning = false;
+  streamDone = false;
+  streamBridgeDone = true;
+  liveAnswerMeta = null;
+  liveAnswerNode = null;
+  currentVisualPayload = { segments:[] };
+  currentBridge = null;
+  const fd = new FormData();
+  fd.append('question', question);
+  fd.append('video_id', VID_ID);
+  fd.append('sid', SID);
+  fd.append('use_video_context', useVideoContext ? '1' : '0');
+  fd.append('preferred_visualization', preferredVisualization);
+  try{
+    const res = await fetch(`${API}/chat-stream`, { method:'POST', body:fd });
+    if(!res.ok || !res.body){
+      await doChatFallback(question, fd);
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while(true){
+      const { value, done } = await reader.read();
+      if(done) break;
+      buffer += decoder.decode(value, { stream:true });
+      let newlineIndex = buffer.indexOf('\n');
+      while(newlineIndex >= 0){
+        const line = buffer.slice(0, newlineIndex).trim();
+        buffer = buffer.slice(newlineIndex + 1);
+        if(line){
+          let evt = null;
+          try{ evt = JSON.parse(line); }catch(err){ console.error(err); }
+          if(evt && evt.event === 'first_text'){
+            const data = evt.data || {};
+            upsertFirstText(data.answer || data.first_segment_text || '');
+          } else if(evt && evt.event === 'plan'){
+            const data = evt.data || {};
+            setPipelineDebug(data.pipeline_debug || null);
+            liveAnswerMeta = data;
+            addAIMsg(data.answer || '', data.timestamp, data.source, data.suggestions || []);
+            if(data.follow_up) addFollowUp(data.follow_up);
+            renderBoardActions(data.board_actions || []);
+            currentBridge = useVideoContext ? (data.reference_bridge || null) : null;
+            if(data.timestamp !== null && data.timestamp !== undefined && useVideoContext) showClip(data.timestamp);
+            if(currentBridge && useVideoContext){
+              streamBridgeDone = false;
+              setAState('answering', 'Preparing the source moment and the first teaching beat.');
+              const bridgeRunToken = streamRunToken;
+              void (async () => {
+                setAState('watching', 'Playing the relevant video moment with its original audio.');
+                await playClipBridge(currentBridge);
+                if(bridgeRunToken !== streamRunToken) return;
+                streamBridgeDone = true;
+                setAState('answering', 'Now I am breaking the idea down step by step.');
+                void kickStreamPlayback();
+              })();
+            } else {
+              streamBridgeDone = true;
+              setAState('answering', 'First teaching beat is being prepared.');
+              void kickStreamPlayback();
+            }
+          } else if(evt && evt.event === 'segment'){
+            const data = evt.data || {};
+            if(data.visual_segment){
+              upsertVisualSegment(data.visual_segment);
+              const segmentId = (data.visual_segment || {}).id || ((data.segment || {}).segment_id || '');
+              if(segmentId) queueReadyAudioSegment(segmentId);
+            }
+            if(streamBridgeDone) void kickStreamPlayback();
+          } else if(evt && evt.event === 'audio_pending'){
+            const data = evt.data || {};
+            if(data.job_id){
+              streamPendingAudio.set(data.job_id, data);
+              void pollAudioJob(data);
+            }
+          } else if(evt && evt.event === 'done'){
+            streamDone = true;
+            if(evt.data && evt.data.pipeline_debug) setPipelineDebug(evt.data.pipeline_debug);
+            for(const segmentId of Array.from(readyAudioSegments.keys())) queueReadyAudioSegment(segmentId);
+            if(evt.data && Array.isArray(evt.data.audio_segments) && evt.data.audio_segments.length && currentVisualPayload){
+              lastAnswerPlayback = { type:'sequence', audioSegments:evt.data.audio_segments, visualPayload:currentVisualPayload };
+            }
+            if(streamBridgeDone) void kickStreamPlayback();
+          } else if(evt && evt.event === 'error'){
+            streamDone = true;
+            streamQueue = [];
+            smsg((evt.data || {}).detail || 'server error');
+            showLoader(false);
+          }
+        }
+        newlineIndex = buffer.indexOf('\n');
+      }
+    }
+  }catch(err){
+    console.error(err);
+    smsg('server error');
+    showLoader(false);
+  }finally{
+    chatBusy = false;
+    if(streamDone && !streamPlaybackRunning){
+      showLoader(false);
+    }
+  }
+}
+async function transcribeRecording(blob){
+  try{
+    const fd = new FormData();
+    fd.append('audio', blob, 'question.webm');
+    const res = await fetch(`${API}/transcribe-question`, { method:'POST', body:fd });
+    const data = await res.json().catch(() => ({}));
+    if(!res.ok){
+      console.error('[immersive] transcription failed', data);
+      return { question:'', error:data.error || data.detail || 'Speech transcription failed.' };
+    }
+    return { question:(data.question || '').trim(), error:'' };
+  }catch(err){
+    console.error('[immersive] transcription request failed', err);
+    return { question:'', error:'The lesson could not transcribe your audio.' };
+  }
+}
+async function handleTranscript(text){
+  if(!text){ setAState('armed', 'No clear transcript was detected. The loop is still active.'); setVoiceHint('Waiting for the next spoken question.'); return; }
+  addMessage('user', text);
+  setAState('thinking', 'Transcribing and interpreting the question.');
+  setVoiceHint(text);
+  await doChat(text);
+  if(isListening){ setAState('armed', 'Answer complete. The loop is armed again.'); setVoiceHint('Waiting for your next spoken question.'); }
+}
+async function ensureMicChain(){
+  if(micStream && micAnalyser){ if(micAudioCtx && micAudioCtx.state === 'suspended') await micAudioCtx.resume(); return; }
+  micStream = await navigator.mediaDevices.getUserMedia({ audio:true });
+  if(!micAudioCtx) micAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if(micAudioCtx.state === 'suspended') await micAudioCtx.resume();
+  micSource = micAudioCtx.createMediaStreamSource(micStream);
+  micAnalyser = micAudioCtx.createAnalyser();
+  micAnalyser.fftSize = 2048;
+  micAnalyser.smoothingTimeConstant = 0.82;
+  micSource.connect(micAnalyser);
+}
+function voiceLevel(){ if(!micAnalyser) return 0; const data = new Uint8Array(micAnalyser.fftSize); micAnalyser.getByteTimeDomainData(data); let sum = 0; for(const sample of data){ const value = (sample - 128) / 128; sum += value * value; } return Math.sqrt(sum / data.length); }
+function setMicWaveformActive(active){
+  const wrap = qs('micWaveformWrap');
+  if(!wrap) return;
+  wrap.classList.toggle('active', !!active);
+  if(!active){
+    if(micWaveformFrame){ cancelAnimationFrame(micWaveformFrame); micWaveformFrame = 0; }
+    const canvas = qs('micWaveform');
+    const ctx = canvas ? canvas.getContext('2d') : null;
+    if(ctx){ ctx.clearRect(0, 0, canvas.width, canvas.height); }
+    return;
+  }
+  if(!micWaveformFrame) drawMicWaveform();
+}
+function drawMicWaveform(){
+  const canvas = qs('micWaveform');
+  const ctx = canvas ? canvas.getContext('2d') : null;
+  if(!(canvas && ctx && micAnalyser && micRecorder && micRecorder.state === 'recording')){
+    setMicWaveformActive(false);
+    return;
+  }
+  const bounds = canvas.getBoundingClientRect();
+  const width = Math.max(160, Math.floor(bounds.width || canvas.parentElement?.clientWidth || 220));
+  const height = Math.max(28, Math.floor(bounds.height || 28));
+  if(canvas.width !== width || canvas.height !== height){
+    canvas.width = width;
+    canvas.height = height;
+  }
+  const bars = 20;
+  const data = new Uint8Array(micAnalyser.frequencyBinCount);
+  micAnalyser.getByteFrequencyData(data);
+  ctx.clearRect(0, 0, width, height);
+  const gap = 3;
+  const barWidth = Math.max(3, Math.floor((width - ((bars - 1) * gap)) / bars));
+  for(let i = 0; i < bars; i += 1){
+    const idx = Math.min(data.length - 1, Math.floor((i / bars) * data.length));
+    const amp = data[idx] / 255;
+    const barHeight = Math.max(4, Math.round(amp * (height - 4)));
+    const x = i * (barWidth + gap);
+    const y = height - barHeight;
+    const grad = ctx.createLinearGradient(x, y, x, height);
+    grad.addColorStop(0, '#7dd3fc');
+    grad.addColorStop(0.5, '#f2b84b');
+    grad.addColorStop(1, '#e86c2f');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, barWidth, barHeight);
+  }
+  micWaveformFrame = requestAnimationFrame(drawMicWaveform);
+}
+function queueReadyAudioSegment(segmentId){
+  const audioItem = readyAudioSegments.get(segmentId);
+  if(!audioItem) return;
+  const visualSegment = getPlaybackSegment(currentVisualPayload, segmentId);
+  if(!visualSegment && !streamDone) return;
+  readyAudioSegments.delete(segmentId);
+  streamQueue.push({ audio_segment:audioItem, visual_segment:visualSegment || null });
+  if(streamBridgeDone) void kickStreamPlayback();
+}
+async function pollAudioJob(job){
+  if(!job || !job.job_id || !job.segment_id) return;
+  const localRunToken = streamRunToken;
+  while(localRunToken === streamRunToken){
+    try{
+      const res = await fetch(`${API}/audio-status/${encodeURIComponent(job.job_id)}`);
+      const data = await res.json().catch(() => ({ ready:false }));
+      if(data.ready && data.url){
+        streamPendingAudio.delete(job.job_id);
+        readyAudioSegments.set(job.segment_id, {
+          segment_id: job.segment_id,
+          label: job.label || '',
+          speech_text: job.speech_text || '',
+          frame_goal: job.frame_goal || '',
+          timing_hint: job.timing_hint || null,
+          audio_url: data.url,
+        });
+        queueReadyAudioSegment(job.segment_id);
+        return;
+      }
+      if(data.error){
+        streamPendingAudio.delete(job.job_id);
+        return;
+      }
+    }catch(err){
+      console.error(err);
+    }
+    await sleep(500);
+  }
+  streamPendingAudio.delete(job.job_id);
+}
+async function calibrateVoiceGate(duration = 900){
+  const samples = [];
+  const started = performance.now();
+  setAState('ready', 'Calibrating the microphone threshold for this room. Stay quiet for a moment.');
+  setVoiceHint('Calibrating ambient noise.');
+  await new Promise((resolve) => {
+    const read = () => {
+      samples.push(voiceLevel());
+      if(performance.now() - started >= duration){ resolve(); return; }
+      requestAnimationFrame(read);
+    };
+    read();
+  });
+  const ordered = samples.slice().sort((a, b) => a - b);
+  const median = ordered[Math.floor(ordered.length * 0.5)] || 0.008;
+  const upper = ordered[Math.floor(ordered.length * 0.9)] || median;
+  voiceThreshold = Math.min(0.09, Math.max(median * 3.2, upper * 1.75, 0.018));
+  return voiceThreshold;
+}
+function beginTurnRecorder(){
+  if(!micStream || (micRecorder && micRecorder.state !== 'inactive')) return;
+  discardTurn = false;
+  micChunks = [];
+  micRecorder = new MediaRecorder(micStream);
+  setMicWaveformActive(true);
+  micRecorder.ondataavailable = (event) => { if(event.data && event.data.size > 0) micChunks.push(event.data); };
+  micRecorder.onstop = async () => {
+    setMicWaveformActive(false);
+    const shouldSkip = discardTurn || !isListening || !micChunks.length;
+    const blob = shouldSkip ? null : new Blob(micChunks, { type: micRecorder.mimeType || 'audio/webm' });
+    micChunks = [];
+    micRecorder = null;
+    if(shouldSkip){ processingTurn = false; return; }
+    setAState('thinking', 'Speech ended. Transcribing and interpreting your question.');
+    setVoiceHint('Processing speech.');
+    const { question:text, error } = await transcribeRecording(blob);
+    if(error){
+      smsg(error);
+      setAState('armed', 'Transcription failed. The loop is still active.');
+      setVoiceHint(error);
+      processingTurn = false;
+      return;
+    }
+    await handleTranscript(text);
+    processingTurn = false;
+    if(isListening){ setAState('armed', 'Listening for the next spoken question.'); }
+  };
+  micRecorder.start();
+}
+function finishTurnRecorder(skip){ discardTurn = skip; if(micRecorder && micRecorder.state !== 'inactive') micRecorder.stop(); else processingTurn = false; }
+function monitorVoice(){
+  if(!isListening){ vadFrame = 0; qs('vFill').style.width = '0%'; return; }
+  if(processingTurn || curAudio){ vadFrame = requestAnimationFrame(monitorVoice); return; }
+  const level = voiceLevel();
+  const fill = Math.max(0, Math.min(100, (level / Math.max(voiceThreshold, 0.001)) * 60));
+  qs('vFill').style.width = `${fill}%`;
+  if(level > voiceThreshold){
+    silenceSince = 0;
+    if(!speechActive){
+      speechActive = true;
+      beginTurnRecorder();
+      setAState('listening', 'Voice detected above the threshold. Keep speaking naturally.');
+      setVoiceHint('Speech detected.');
+    } else {
+      setAState('listening', 'Listening to your question.');
+    }
+  } else if(speechActive){
+    if(!silenceSince){
+      silenceSince = performance.now();
+      setAState('thinking', 'Silence detected. Holding for two seconds before transcription.');
+      setVoiceHint('Speech pause detected.');
+    }
+    if(performance.now() - silenceSince >= 2000){
+      speechActive = false;
+      silenceSince = 0;
+      processingTurn = true;
+      finishTurnRecorder(false);
+    }
+  } else {
+    setAState('armed', `Loop is active. Speak above the gate ${(voiceThreshold * 100).toFixed(1)}%.`);
+  }
+  vadFrame = requestAnimationFrame(monitorVoice);
+}
+function stopImmersiveTalk(){
+  isListening = false;
+  speechActive = false;
+  silenceSince = 0;
+  discardTurn = true;
+  processingTurn = false;
+  if(vadFrame){ cancelAnimationFrame(vadFrame); vadFrame = 0; }
+  finishTurnRecorder(true);
+  if(micSource){ try{ micSource.disconnect(); }catch{} micSource = null; }
+  if(micStream){ micStream.getTracks().forEach((track) => track.stop()); micStream = null; }
+  micAnalyser = null;
+  setMicWaveformActive(false);
+  qs('vFill').style.width = '0%';
+  stopAudio();
+  clearInterval(clipInterval); clipInterval = null;
+  qs('videoOverlay').classList.remove('show', 'closing');
+  qs('listenBtn').textContent = 'start immersive talk';
+  qs('listenBtn').classList.remove('active');
+  setAState('stopped', 'The immersive loop is paused. Press start when you want to continue.');
+  setVoiceHint('No transcript yet.');
+}
+window.toggleListening = async () => {
+  if(isListening){ stopImmersiveTalk(); return; }
+  try{
+    stopAudio();
+    clearInterval(clipInterval); clipInterval = null;
+    qs('videoOverlay').classList.remove('show', 'closing');
+    await ensureMicChain();
+    await calibrateVoiceGate();
+    isListening = true;
+    speechActive = false;
+    silenceSince = 0;
+    discardTurn = false;
+    processingTurn = false;
+    qs('listenBtn').textContent = 'stop and rest';
+    qs('listenBtn').classList.add('active');
+    setAState('armed', `Immersive listening is active. Silence for two seconds triggers transcription. Gate ${(voiceThreshold * 100).toFixed(1)}%.`);
+    setVoiceHint('Waiting for your voice.');
+    monitorVoice();
+  }catch(err){ console.error(err); setAState('error', 'Microphone access failed. Check browser permissions and try again.'); }
+};
+window.replayLastAnswer = () => { if(lastAnswerPlayback) replayPlayback(lastAnswerPlayback); };
+function initAvatarStage(){
+  const host = qs('avatarStage');
+  scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x080808, 7, 11);
+  camera = new THREE.PerspectiveCamera(26, host.clientWidth / host.clientHeight, .1, 100);
+  camera.position.set(0, .55, 6.2);
+  renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(host.clientWidth, host.clientHeight);
+  host.appendChild(renderer.domElement);
+
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x10213d, 1.55);
+  scene.add(hemi);
+  const key = new THREE.DirectionalLight(0xffffff, 1.38);
+  key.position.set(3.4, 4.8, 5.2);
+  scene.add(key);
+  const rim = new THREE.PointLight(0xe86c2f, 2.0, 14, 2);
+  rim.position.set(-2.8, 2.2, 3.4);
+  scene.add(rim);
+
+  const root = new THREE.Group();
+  root.position.y = -.15;
+  scene.add(root);
+  const toon = (color) => new THREE.MeshToonMaterial({ color });
+
+  torso = new THREE.Mesh(new THREE.CapsuleGeometry(1.02, 1.6, 10, 22), toon(0x2c5364));
+  torso.position.set(0, -.92, 0);
+  torso.scale.z = .9;
+  root.add(torso);
+
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(.54, .08, 18, 42), toon(0xf1f5ff));
+  collar.rotation.x = Math.PI / 2;
+  collar.position.set(0, .1, .24);
+  root.add(collar);
+
+  neck = new THREE.Mesh(new THREE.CylinderGeometry(.28, .32, .52, 18), toon(0xe1b99a));
+  neck.position.set(0, .38, .08);
+  root.add(neck);
+
+  head = new THREE.Mesh(new THREE.SphereGeometry(1.02, 36, 36), toon(0xe1b99a));
+  head.position.set(0, 1.45, .02);
+  head.scale.set(1, 1.08, .98);
+  root.add(head);
+
+  hair = new THREE.Mesh(new THREE.SphereGeometry(1.12, 36, 36, 0, Math.PI * 2, 0, Math.PI * .62), toon(0x241c19));
+  hair.position.set(0, 1.68, -.02);
+  root.add(hair);
+
+  hairFront = new THREE.Mesh(new THREE.CapsuleGeometry(.18, .58, 6, 12), toon(0x241c19));
+  hairFront.position.set(0, 1.46, .86);
+  hairFront.rotation.x = .22;
+  root.add(hairFront);
+
+  hairSideLeft = new THREE.Mesh(new THREE.CapsuleGeometry(.16, .82, 6, 12), toon(0x241c19));
+  hairSideRight = hairSideLeft.clone();
+  hairSideLeft.position.set(-.88, 1.34, .08);
+  hairSideRight.position.set(.88, 1.34, .08);
+  hairSideLeft.rotation.z = .18;
+  hairSideRight.rotation.z = -.18;
+  root.add(hairSideLeft, hairSideRight);
+
+  const eyeWhiteGeo = new THREE.SphereGeometry(.14, 18, 18);
+  const eyeWhiteMat = toon(0xf8fbff);
+  const leftEyeWhite = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat);
+  const rightEyeWhite = leftEyeWhite.clone();
+  leftEyeWhite.scale.set(1.22, .84, .6);
+  rightEyeWhite.scale.set(1.22, .84, .6);
+  leftEyeWhite.position.set(-.31, 1.48, .83);
+  rightEyeWhite.position.set(.31, 1.48, .83);
+  root.add(leftEyeWhite, rightEyeWhite);
+
+  const irisGeo = new THREE.SphereGeometry(.07, 16, 16);
+  const irisMat = toon(0x161a20);
+  const leftIris = new THREE.Mesh(irisGeo, irisMat);
+  const rightIris = leftIris.clone();
+  leftIris.position.set(-.31, 1.47, .94);
+  rightIris.position.set(.31, 1.47, .94);
+  root.add(leftIris, rightIris);
+
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(.08, .26, 12), toon(0xd09a79));
+  nose.position.set(0, 1.28, .98);
+  nose.rotation.x = Math.PI / 2;
+  root.add(nose);
+
+  mouth = new THREE.Mesh(new THREE.TorusGeometry(.17, .034, 10, 28, Math.PI), toon(0x7a2a45));
+  mouth.position.set(0, 1.01, .96);
+  mouth.rotation.z = Math.PI;
+  root.add(mouth);
+
+  leftBrow = new THREE.Mesh(new THREE.BoxGeometry(.28, .04, .03), toon(0x241c19));
+  rightBrow = leftBrow.clone();
+  leftBrow.position.set(-.31, 1.63, .92);
+  rightBrow.position.set(.31, 1.63, .92);
+  leftBrow.rotation.z = -.12;
+  rightBrow.rotation.z = .12;
+  root.add(leftBrow, rightBrow);
+
+  leftArm = new THREE.Mesh(new THREE.CapsuleGeometry(.13, 1.12, 6, 12), toon(0x2c5364));
+  rightArm = leftArm.clone();
+  leftArm.position.set(-1.2, -.48, .02);
+  rightArm.position.set(1.2, -.48, .02);
+  leftArm.rotation.z = .38;
+  rightArm.rotation.z = -.38;
+  root.add(leftArm, rightArm);
+
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(2.15, .04, 16, 72), new THREE.MeshBasicMaterial({ color:0xe86c2f, transparent:true, opacity:.32 }));
+  halo.position.set(0, 1.1, -1.12);
+  halo.rotation.x = Math.PI / 2;
+  scene.add(halo);
+
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(2.8, 64), new THREE.MeshBasicMaterial({ color:0x091420 }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -2.35;
+  scene.add(floor);
+
+  const particles = [];
+  const particleGeo = new THREE.SphereGeometry(.035, 10, 10);
+  for(let i = 0; i < 24; i += 1){
+    const particle = new THREE.Mesh(particleGeo, new THREE.MeshBasicMaterial({ color:i % 2 ? 0xe86c2f : 0x7dd3fc, transparent:true, opacity:.45 }));
+    particle.position.set((Math.random() - .5) * 4.4, Math.random() * 3.6 - .6, -1.1 + Math.random() * 1.4);
+    scene.add(particle);
+    particles.push(particle);
+  }
+
+  let blink = 1;
+  function loop(t = 0){
+    requestAnimationFrame(loop);
+    const k = t * .001;
+    const talk = analyser && curAudio ? (() => { const data = new Uint8Array(analyser.frequencyBinCount); analyser.getByteFrequencyData(data); let sum = 0; for(const v of data) sum += v; return Math.min(1, (sum / data.length) / 108); })() : 0;
+    const blinkWave = Math.abs(Math.sin(k * .9 + 1.4));
+    blink = blinkWave < .04 ? .14 : 1;
+    head.rotation.y = Math.sin(k * .72) * .08;
+    head.rotation.x = Math.sin(k * .44) * .03;
+    head.position.y = 1.45 + Math.sin(k * 1.25) * .04;
+    hair.position.y = 1.68 + Math.sin(k * 1.25) * .02;
+    mouth.scale.set(1 + talk * .18, 1 + talk * 3.8, 1);
+    leftArm.rotation.z = .38 + Math.sin(k * 1.8) * .04 + talk * .08;
+    rightArm.rotation.z = -.38 - Math.sin(k * 1.8) * .04 - talk * .08;
+    leftBrow.position.y = 1.63 + talk * .02;
+    rightBrow.position.y = 1.63 + talk * .02;
+    leftEyeWhite.scale.y = .84 * blink;
+    rightEyeWhite.scale.y = .84 * blink;
+    leftIris.position.y = 1.47 + (blink < .3 ? -.03 : 0);
+    rightIris.position.y = 1.47 + (blink < .3 ? -.03 : 0);
+    halo.rotation.z += .004;
+    particles.forEach((particle, idx) => {
+      particle.position.y += Math.sin(k * .8 + idx) * .0022;
+      particle.position.x += Math.cos(k * .55 + idx) * .0016;
+    });
+    renderer.render(scene, camera);
+  }
+  loop();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = host.clientWidth / host.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(host.clientWidth, host.clientHeight);
+  });
+}
+function applyAvatar(avatar){
+  currentAvatar = avatar;
+  const s = avatar.style || {};
+  head.material.color.set(s.skin || '#e1b99a');
+  neck.material.color.set(s.skin || '#e1b99a');
+  hair.material.color.set(s.hair || '#241c19');
+  hairFront.material.color.set(s.hair || '#241c19');
+  hairSideLeft.material.color.set(s.hair || '#241c19');
+  hairSideRight.material.color.set(s.hair || '#241c19');
+  torso.material.color.set(s.shirt || '#2c5364');
+  leftArm.material.color.set(s.shirt || '#2c5364');
+  rightArm.material.color.set(s.shirt || '#2c5364');
+  leftBrow.material.color.set(s.hair || '#241c19');
+  rightBrow.material.color.set(s.hair || '#241c19');
+  qs('avatarStage').style.background = `radial-gradient(circle at top, ${(s.accent || '#e86c2f')}44, rgba(8,8,8,.96) 62%)`;
+  qs('avatarName').textContent = avatar.name;
+  qs('avatarRole').textContent = PERSONAS[avatar.id] || 'AI lesson guide';
+  qs('voiceTag').textContent = (avatar.voice || 'voice').replace(/_/g, ' ');
+  qs('lessonTag').textContent = vidInfo ? vidInfo.title : 'lesson';
+}
+
+async function init(){
+  if(!VID_ID){ location.href = '/'; return; }
+  if(!AVATAR_ID){ location.href = `/avatar-select?id=${encodeURIComponent(VID_ID)}&sid=${encodeURIComponent(SID)}`; return; }
+  syncVideoContextButton();
+  syncVisualizationButton();
+  renderPipelineDebug();
+  syncDebugPanel();
+  initAvatarStage();
+  initWhiteboard();
+  const [metaRes, avatarRes] = await Promise.all([fetch(`${API}/video-meta/${VID_ID}`), fetch(`${API}/avatar-presets`)]);
+  vidInfo = await metaRes.json();
+  avatars = await avatarRes.json();
+  const avatar = avatars.find((item) => item.id === AVATAR_ID) || avatars[0];
+  if(!avatar){ location.href = `/avatar-select?id=${encodeURIComponent(VID_ID)}&sid=${encodeURIComponent(SID)}`; return; }
+  await fetch(`${API}/set-avatar`, { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ sid:SID, avatar_id:avatar.id }) });
+  applyAvatar(avatar);
+  const creatorLine = [vidInfo.creator || vidInfo.creator_name || 'The creator', vidInfo.creator_profession || 'Educator'].filter(Boolean).join(', ');
+  addSystem(`${creatorLine} is ready as an AI twin for ${vidInfo.title || 'this lesson'}.`);
+  addSystem(useVideoContext ? 'Video-context mode is active for this session.' : 'Direct teaching mode is active for this session.');
+  renderBoardActions([{ type:'title', text:vidInfo.title || 'Lesson board' }, { type:'bullet', text:'The board will stay in one clear classroom style and sync with the spoken answer.' }]);
+  await greetSession();
+}
+
+window.addEventListener('resize', fitBoard);
+init().catch((err) => { console.error(err); setAState('error', 'The learn page failed to initialize.'); });
+</script>
+</body>
+</html>

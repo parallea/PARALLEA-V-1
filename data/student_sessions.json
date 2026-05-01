@@ -1,0 +1,985 @@
+[
+  {
+    "id": "ses_1d0e9482a60d49d8",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "I want to learn linear algebra foundation for machine learning.",
+    "mode": "video_context",
+    "current_roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "current_part_id": "prt_5d3864bc2f114c81",
+    "current_part_index": 0,
+    "state": "waiting_for_part_confirmation",
+    "matched_part_ids": [
+      "prt_5d3864bc2f114c81",
+      "prt_eec967b81068463a",
+      "prt_6bd08eec6e844c80"
+    ],
+    "confidence": 1.0,
+    "created_at": "2026-04-30T14:03:16.746441+00:00",
+    "updated_at": "2026-04-30T14:04:04.333114+00:00"
+  },
+  {
+    "id": "ses_d6984e510a444b53",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": null,
+    "mode": null,
+    "current_roadmap_id": null,
+    "current_part_id": null,
+    "current_part_index": 0,
+    "state": "awaiting_topic",
+    "matched_part_ids": [],
+    "confidence": 0.0,
+    "created_at": "2026-04-30T14:48:37.112283+00:00",
+    "updated_at": "2026-04-30T14:48:37.115038+00:00"
+  },
+  {
+    "id": "ses_41cd7a94f28449ca",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "I want to learn how linear algebra foundation for machine learning. Can you take me that?",
+    "mode": "video_context",
+    "current_roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "current_part_id": "prt_5d3864bc2f114c81",
+    "current_part_index": 0,
+    "state": "awaiting_clarification_feedback",
+    "matched_part_ids": [
+      "prt_5d3864bc2f114c81",
+      "prt_dba57897e1ef4b6a",
+      "prt_2a8be689975747e1",
+      "prt_eec967b81068463a",
+      "prt_c91a22d8bda74363",
+      "prt_7108231784bd4ee3",
+      "prt_6bd08eec6e844c80"
+    ],
+    "confidence": 1.0,
+    "created_at": "2026-04-30T14:48:51.894819+00:00",
+    "updated_at": "2026-04-30T14:51:39.652649+00:00"
+  },
+  {
+    "id": "ses_a11171fd0ada467f",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": null,
+    "mode": null,
+    "current_roadmap_id": null,
+    "current_part_id": null,
+    "current_part_index": 0,
+    "state": "awaiting_topic",
+    "matched_part_ids": [],
+    "confidence": 0.0,
+    "created_at": "2026-04-30T15:40:52.730839+00:00",
+    "updated_at": "2026-04-30T15:40:52.734404+00:00"
+  },
+  {
+    "id": "ses_a79c2e5d5c2e4e0b",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "akan mekan cosine Volvo,negogiaancast tidak akan gembira gembira mak into",
+    "mode": "persona_only",
+    "current_roadmap_id": null,
+    "current_part_id": null,
+    "current_part_index": 0,
+    "state": "persona_only_teaching",
+    "matched_part_ids": [],
+    "confidence": 0.25,
+    "created_at": "2026-04-30T15:41:10.862339+00:00",
+    "updated_at": "2026-04-30T15:42:06.255200+00:00"
+  },
+  {
+    "id": "ses_1e3181e9d5054537",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "dan avez",
+    "mode": "persona_only",
+    "current_roadmap_id": null,
+    "current_part_id": null,
+    "current_part_index": 0,
+    "state": "persona_only_confirmation",
+    "matched_part_ids": [],
+    "confidence": 0.0,
+    "created_at": "2026-04-30T16:01:25.381849+00:00",
+    "updated_at": "2026-04-30T16:01:55.656195+00:00"
+  },
+  {
+    "id": "ses_37cfc869b24a468f",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "Well, I want to learn linear algebra foundations for machine learning",
+    "mode": "video_context",
+    "current_roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "current_part_id": "prt_dba57897e1ef4b6a",
+    "current_part_index": 1,
+    "state": "playing_video_part",
+    "matched_part_ids": [
+      "prt_5d3864bc2f114c81",
+      "prt_dba57897e1ef4b6a",
+      "prt_2a8be689975747e1",
+      "prt_eec967b81068463a",
+      "prt_c91a22d8bda74363",
+      "prt_7108231784bd4ee3",
+      "prt_6bd08eec6e844c80"
+    ],
+    "confidence": 1.0,
+    "created_at": "2026-04-30T16:16:50.758979+00:00",
+    "updated_at": "2026-04-30T16:20:47.538634+00:00"
+  },
+  {
+    "id": "ses_8e35ddfa007549e3",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": null,
+    "mode": null,
+    "current_roadmap_id": null,
+    "current_part_id": null,
+    "current_part_index": 0,
+    "state": "awaiting_topic",
+    "matched_part_ids": [],
+    "confidence": 0.0,
+    "created_at": "2026-04-30T17:45:40.089715+00:00",
+    "updated_at": "2026-04-30T17:45:40.093334+00:00"
+  },
+  {
+    "id": "ses_b56be218f7354fa4",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "the vectorization of fraud data. Can you please teach me",
+    "mode": "video_context",
+    "current_roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "current_part_id": "prt_5d3864bc2f114c81",
+    "current_part_index": 0,
+    "state": "awaiting_clarification_feedback",
+    "matched_part_ids": [
+      "prt_5d3864bc2f114c81",
+      "prt_dba57897e1ef4b6a",
+      "prt_2a8be689975747e1",
+      "prt_eec967b81068463a",
+      "prt_c91a22d8bda74363",
+      "prt_7108231784bd4ee3",
+      "prt_6bd08eec6e844c80"
+    ],
+    "confidence": 0.533,
+    "created_at": "2026-04-30T18:03:18.045367+00:00",
+    "updated_at": "2026-04-30T18:05:49.906291+00:00"
+  },
+  {
+    "id": "ses_4167b24df2be43a3",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": null,
+    "mode": null,
+    "current_roadmap_id": null,
+    "current_part_id": null,
+    "current_part_index": 0,
+    "state": "awaiting_topic",
+    "matched_part_ids": [],
+    "confidence": 0.0,
+    "created_at": "2026-04-30T18:20:10.009055+00:00",
+    "updated_at": "2026-04-30T18:20:10.012719+00:00"
+  },
+  {
+    "id": "ses_70f3a73af0c64899",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "Well, I want to learn embanding and symmetric similarity",
+    "mode": "persona_only",
+    "current_roadmap_id": null,
+    "current_part_id": null,
+    "current_part_index": 0,
+    "state": "persona_only_teaching",
+    "matched_part_ids": [],
+    "confidence": 0.35,
+    "created_at": "2026-04-30T18:31:13.089886+00:00",
+    "updated_at": "2026-04-30T18:32:07.663632+00:00"
+  },
+  {
+    "id": "ses_19f612691b194bea",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "Well I want to learn linear algebra foundations for machine learning",
+    "mode": "video_context",
+    "current_roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "current_part_id": "prt_5d3864bc2f114c81",
+    "current_part_index": 0,
+    "state": "awaiting_clarification_feedback",
+    "matched_part_ids": [
+      "prt_5d3864bc2f114c81",
+      "prt_dba57897e1ef4b6a",
+      "prt_2a8be689975747e1",
+      "prt_eec967b81068463a",
+      "prt_c91a22d8bda74363",
+      "prt_7108231784bd4ee3",
+      "prt_6bd08eec6e844c80"
+    ],
+    "confidence": 1.0,
+    "created_at": "2026-04-30T18:33:28.027963+00:00",
+    "updated_at": "2026-04-30T18:36:40.229869+00:00"
+  },
+  {
+    "id": "ses_13d58d60cea54163",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "Well, I want to learn linear algebra foundations for machine learning",
+    "mode": "video_context",
+    "current_roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "current_part_id": "prt_5d3864bc2f114c81",
+    "current_part_index": 0,
+    "state": "awaiting_clarification_feedback",
+    "matched_part_ids": [
+      "prt_5d3864bc2f114c81",
+      "prt_dba57897e1ef4b6a",
+      "prt_2a8be689975747e1",
+      "prt_eec967b81068463a",
+      "prt_c91a22d8bda74363",
+      "prt_7108231784bd4ee3",
+      "prt_6bd08eec6e844c80"
+    ],
+    "confidence": 1.0,
+    "created_at": "2026-04-30T19:00:06.666626+00:00",
+    "updated_at": "2026-04-30T19:04:00.120030+00:00"
+  },
+  {
+    "id": "ses_16f75ff1265146cd",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "Well, I would like to learn linear algebra foundations for machine learning",
+    "mode": "video_context",
+    "current_roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "current_part_id": "prt_dba57897e1ef4b6a",
+    "current_part_index": 1,
+    "state": "playing_video_part",
+    "matched_part_ids": [
+      "prt_5d3864bc2f114c81",
+      "prt_dba57897e1ef4b6a",
+      "prt_2a8be689975747e1",
+      "prt_eec967b81068463a",
+      "prt_c91a22d8bda74363",
+      "prt_7108231784bd4ee3",
+      "prt_6bd08eec6e844c80"
+    ],
+    "confidence": 1.0,
+    "created_at": "2026-04-30T19:29:29.093697+00:00",
+    "updated_at": "2026-04-30T19:34:23.266718+00:00"
+  },
+  {
+    "id": "ses_329ceb7590d645cf",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "Can you please explain to me visually how does my dosis process occurs in biological systems",
+    "mode": "persona_only",
+    "current_roadmap_id": null,
+    "current_part_id": null,
+    "current_part_index": 0,
+    "state": "persona_only_teaching",
+    "matched_part_ids": [],
+    "confidence": 0.267,
+    "created_at": "2026-04-30T19:34:35.580691+00:00",
+    "updated_at": "2026-04-30T19:35:26.122708+00:00"
+  },
+  {
+    "id": "ses_8416e6ad1652440f",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "Can you please teach me how does pro-cariotic cells do divide divisions",
+    "mode": "persona_only",
+    "current_roadmap_id": null,
+    "current_part_id": null,
+    "current_part_index": 0,
+    "state": "persona_only_teaching",
+    "matched_part_ids": [],
+    "confidence": 0.067,
+    "created_at": "2026-04-30T20:02:27.118353+00:00",
+    "updated_at": "2026-04-30T20:04:24.744988+00:00"
+  },
+  {
+    "id": "ses_be659d1bfddf4d00",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "Well, I want to learn vectorization of fraud data. Can you please explain to me",
+    "mode": "video_context",
+    "current_roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "current_part_id": "prt_5d3864bc2f114c81",
+    "current_part_index": 0,
+    "state": "awaiting_clarification_feedback",
+    "matched_part_ids": [
+      "prt_5d3864bc2f114c81",
+      "prt_dba57897e1ef4b6a",
+      "prt_2a8be689975747e1",
+      "prt_eec967b81068463a",
+      "prt_c91a22d8bda74363",
+      "prt_7108231784bd4ee3",
+      "prt_6bd08eec6e844c80"
+    ],
+    "confidence": 0.533,
+    "created_at": "2026-04-30T20:34:37.763155+00:00",
+    "updated_at": "2026-04-30T20:36:23.086816+00:00"
+  },
+  {
+    "id": "ses_5c1c60d21861469d",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "Well, I want to learn how mitochondria produces energy",
+    "mode": "persona_only",
+    "current_roadmap_id": null,
+    "current_part_id": null,
+    "current_part_index": 0,
+    "state": "persona_only_teaching",
+    "matched_part_ids": [],
+    "confidence": 0.0,
+    "created_at": "2026-04-30T21:03:26.160359+00:00",
+    "updated_at": "2026-04-30T21:04:17.320197+00:00"
+  },
+  {
+    "id": "ses_4117e358e271486b",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "Will I want to learn about Linear algebra Foundation for Machine Learning",
+    "mode": "video_context",
+    "current_roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "current_part_id": "prt_5d3864bc2f114c81",
+    "current_part_index": 0,
+    "state": "awaiting_clarification_feedback",
+    "matched_part_ids": [
+      "prt_5d3864bc2f114c81",
+      "prt_dba57897e1ef4b6a",
+      "prt_2a8be689975747e1",
+      "prt_eec967b81068463a",
+      "prt_c91a22d8bda74363",
+      "prt_7108231784bd4ee3",
+      "prt_6bd08eec6e844c80"
+    ],
+    "confidence": 1.0,
+    "memory": {
+      "current_topic": "Will I want to learn about Linear algebra Foundation for Machine Learning",
+      "current_step": "Why ML needs math",
+      "last_user_message": "Well, it doesn't.",
+      "last_assistant_answer": "Let's slow down on Why ML needs math. The video part is pointing to this idea: The lesson opens by asking how a model tells a dog from a cat and answers that computers need mathematics to translate raw inputs into... Your doubt is about Well, it doesn't., so watch how the pieces connect. The key is to follow the cause, then the change, then the result.",
+      "last_visual_plan": [
+        {
+          "start": 0.0,
+          "end": 3.0,
+          "cue": "Reveal the first idea"
+        },
+        {
+          "start": 3.0,
+          "end": 8.5,
+          "cue": "Move the marker to the changing step"
+        },
+        {
+          "start": 8.5,
+          "end": 13.1,
+          "cue": "Highlight the result"
+        },
+        {
+          "start": 13.1,
+          "end": 17.8,
+          "cue": "Circle the whole pattern"
+        }
+      ],
+      "student_understanding_summary": "Awaiting the student's response to the latest explanation.",
+      "unresolved_student_question": "Well, it doesn't.",
+      "next_teaching_goal": "Does that make sense now?",
+      "recent_turns": [
+        {
+          "role": "student",
+          "content": "Will I want to learn about Linear algebra Foundation for Machine Learning",
+          "created_at": "2026-04-30T21:36:54.023081+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "Is there anything in this part that you didn't understand?",
+          "created_at": "2026-04-30T21:38:04.248745+00:00"
+        },
+        {
+          "role": "student",
+          "content": "Well, I didn't understand how does a computer analysis an image and predicts what's in the image, whether it's a dog or it's a cat.",
+          "created_at": "2026-04-30T21:38:27.320669+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "Let's slow down on Why ML needs math. The video part is pointing to this idea: The lesson opens by asking how a model tells a dog from a cat and answers that computers need mathematics to translate raw inputs into... Your doubt is about Well, I didn't understand how does a computer analysis an image and predicts what's in the image, whether it's a dog or it's a cat., so watch how the pieces connect. The key is to follow the cause, then the change, then the result.\n\nDoes that make sense now?",
+          "created_at": "2026-04-30T21:38:34.572663+00:00"
+        },
+        {
+          "role": "student",
+          "content": "Well, it doesn't.",
+          "created_at": "2026-04-30T21:39:10.846537+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "Let's slow down on Why ML needs math. The video part is pointing to this idea: The lesson opens by asking how a model tells a dog from a cat and answers that computers need mathematics to translate raw inputs into... Your doubt is about Well, it doesn't., so watch how the pieces connect. The key is to follow the cause, then the change, then the result.\n\nDoes that make sense now?",
+          "created_at": "2026-04-30T21:39:17.181994+00:00"
+        }
+      ],
+      "updated_at": "2026-04-30T21:39:17.185224+00:00"
+    },
+    "created_at": "2026-04-30T21:36:23.056635+00:00",
+    "updated_at": "2026-04-30T21:39:17.186231+00:00"
+  },
+  {
+    "id": "ses_81936f6e092c4fa4",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "Well, I want to learn how Osmosis occurs in animal cells",
+    "mode": "persona_only",
+    "current_roadmap_id": null,
+    "current_part_id": null,
+    "current_part_index": 0,
+    "state": "persona_only_teaching",
+    "matched_part_ids": [],
+    "confidence": 0.0,
+    "memory": {
+      "current_topic": "Well, I want to learn how Osmosis occurs in animal cells",
+      "current_step": "step 0",
+      "last_user_message": "Yes, please go ahead.",
+      "last_assistant_answer": "I have not uploaded a video for Well, I want to learn how Osmosis occurs in animal cells yet, but I can still explain it in Fang-Fang lee's style. Start with the simplest version: Please introduce Well, I want to learn how Osmosis occurs in animal cells in your teaching style. has a few parts that work together. Watch the visual move from the first part to the result so the relationship is clear. Now use that same relationship when you see a new example.",
+      "last_visual_plan": [
+        {
+          "start": 0.0,
+          "end": 5.5,
+          "cue": "Reveal the first idea"
+        },
+        {
+          "start": 5.5,
+          "end": 11.0,
+          "cue": "Move the marker to the changing step"
+        },
+        {
+          "start": 11.0,
+          "end": 16.5,
+          "cue": "Highlight the result"
+        },
+        {
+          "start": 16.5,
+          "end": 20.4,
+          "cue": "Circle the whole pattern"
+        }
+      ],
+      "student_understanding_summary": "Awaiting the student's response to the latest explanation.",
+      "unresolved_student_question": "Please introduce Well, I want to learn how Osmosis occurs in animal cells in your teaching style.",
+      "next_teaching_goal": "Does that make sense now?",
+      "recent_turns": [
+        {
+          "role": "assistant",
+          "content": "Hey Ayush, I am Fang-Fang lee. I am a Mathematics professor and AI/Ml Engineer. I know topics like Mathematics, Machine, learning, linear algebra foundations for machine learning and vectorization of raw data. What do you want to learn today?",
+          "created_at": "2026-04-30T21:41:40.876571+00:00"
+        },
+        {
+          "role": "student",
+          "content": "Well, I want to learn how Osmosis occurs in animal cells",
+          "created_at": "2026-04-30T21:42:17.060664+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "I haven't uploaded a video on Well, I want to learn how Osmosis occurs in animal cells yet, but I can still explain it in my teaching style. Want me to go ahead?",
+          "created_at": "2026-04-30T21:42:17.074926+00:00"
+        },
+        {
+          "role": "student",
+          "content": "Yes, please go ahead.",
+          "created_at": "2026-04-30T21:42:34.686402+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "I have not uploaded a video for Well, I want to learn how Osmosis occurs in animal cells yet, but I can still explain it in Fang-Fang lee's style. Start with the simplest version: Please introduce Well, I want to learn how Osmosis occurs in animal cells in your teaching style. has a few parts that work together. Watch the visual move from the first part to the result so the relationship is clear. Now use that same relationship when you see a new example.\n\nDoes that make sense now?",
+          "created_at": "2026-04-30T21:42:41.613647+00:00"
+        }
+      ],
+      "updated_at": "2026-04-30T21:42:41.617795+00:00"
+    },
+    "created_at": "2026-04-30T21:41:40.874591+00:00",
+    "updated_at": "2026-04-30T21:42:41.617816+00:00"
+  },
+  {
+    "id": "ses_10e92734dbb749c3",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "Well, I want to learn how this osmosis occurs in plant cells",
+    "mode": "persona_only",
+    "current_roadmap_id": null,
+    "current_part_id": null,
+    "current_part_index": 0,
+    "state": "persona_only_teaching",
+    "matched_part_ids": [],
+    "confidence": 0.017,
+    "memory": {
+      "current_topic": "Mitosis phases",
+      "current_step": "step 1",
+      "last_user_message": "Let's explore the phases of my doses in more detail with much more better visual explanation. Can you do that?",
+      "last_assistant_answer": "Alright, Ayush! Let's break down the phases of mitosis visually. First, we start with a single cell. As we see it, we'll highlight the chromosomes inside, which are like tiny packages of genetic information. Next, we'll animate the chromosomes duplicating, so we have two sets. After that, we'll show the cell elongating, preparing for division, with arrows indicating this process. Finally, we'll animate the cell membrane pinching inwards, leading to the formation of two separate cells. This whole process is crucial for growth and repair in living organisms. Ready to see this in action?",
+      "last_visual_plan": [
+        {
+          "start": 0.0,
+          "end": 4.0,
+          "cue": "A single cell appears on the screen, representing the starting point of mitosis."
+        },
+        {
+          "start": 4.0,
+          "end": 8.0,
+          "cue": "Chromosomes are highlighted within the cell, showing their structure."
+        },
+        {
+          "start": 8.0,
+          "end": 12.0,
+          "cue": "The chromosomes duplicate, showing two sets within the cell."
+        },
+        {
+          "start": 12.0,
+          "end": 16.0,
+          "cue": "The cell elongates, preparing for division, with arrows indicating the process."
+        },
+        {
+          "start": 16.0,
+          "end": 20.0,
+          "cue": "The cell membrane pinches inwards, leading to the formation of two separate cells."
+        }
+      ],
+      "student_understanding_summary": "The student is eager to learn about the phases of mitosis with a visual explanation.",
+      "unresolved_student_question": "Let's explore the phases of my doses in more detail with much more better visual explanation. Can you do that?",
+      "next_teaching_goal": "Does this visual breakdown of mitosis make sense, or is there a specific phase you'd like to dive deeper into?",
+      "recent_turns": [
+        {
+          "role": "student",
+          "content": "Well, the visualization is kind of off to me. Can you explain it more visually?",
+          "created_at": "2026-04-30T21:47:27.633631+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "Great, Ayush! Let's visualize osmosis step by step. First, imagine a sponge. As we see it here, water droplets will animate towards the sponge, showing how it absorbs water. Now, let's transition to a plant cell diagram. Notice how water molecules move through the cell membrane. This movement is osmosis, and we can highlight the term 'osmosis' as arrows show the water moving in. Next, we'll animate a crowd of dots, representing water molecules, moving from a crowded area to a less crowded area, mimicking the concentration gradient. Finally, we'll see a plant standing tall, with arrows indicating the pressure from inside the cell pushing against the cell wall, which is crucial for the plant's health. Does this visual approach help clarify osmosis for you?\n\nDoes this visual approach help clarify osmosis for you, or would you like to explore any part of it further?",
+          "created_at": "2026-04-30T21:47:56.867016+00:00"
+        },
+        {
+          "role": "student",
+          "content": "Well, I did understand it. Now I just want to know how does mitosis occur? Mitosis and what is mitosis?",
+          "created_at": "2026-04-30T21:49:12.572523+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "Absolutely, Ayush! Mitosis is the process by which a single cell divides to produce two identical daughter cells. Let's visualize this step by step. First, we'll show a single cell, and then we'll animate the chromosomes inside it, which are like tiny packages of genetic information. Next, we'll illustrate the chromosomes duplicating, so we have two sets. After that, we'll show the cell elongating, preparing for division. Finally, we'll animate the cell membrane pinching inwards, leading to the formation of two separate cells. This whole process is crucial for growth and repair in living organisms. Does that help clarify what mitosis is?\n\nWould you like to explore the phases of mitosis in more detail, or do you have any specific questions about it?",
+          "created_at": "2026-04-30T21:49:31.714965+00:00"
+        },
+        {
+          "role": "student",
+          "content": "Let's explore the phases of my doses in more detail with much more better visual explanation. Can you do that?",
+          "created_at": "2026-04-30T21:50:36.522313+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "Alright, Ayush! Let's break down the phases of mitosis visually. First, we start with a single cell. As we see it, we'll highlight the chromosomes inside, which are like tiny packages of genetic information. Next, we'll animate the chromosomes duplicating, so we have two sets. After that, we'll show the cell elongating, preparing for division, with arrows indicating this process. Finally, we'll animate the cell membrane pinching inwards, leading to the formation of two separate cells. This whole process is crucial for growth and repair in living organisms. Ready to see this in action?\n\nDoes this visual breakdown of mitosis make sense, or is there a specific phase you'd like to dive deeper into?",
+          "created_at": "2026-04-30T21:50:53.421977+00:00"
+        }
+      ],
+      "updated_at": "2026-04-30T21:50:53.426042+00:00"
+    },
+    "created_at": "2026-04-30T21:45:12.489240+00:00",
+    "updated_at": "2026-04-30T21:50:53.426058+00:00"
+  },
+  {
+    "id": "ses_9afa7f5d01f74e27",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "linear algebra foundations for machine learning",
+    "mode": "video_context",
+    "current_roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "current_part_id": "prt_5d3864bc2f114c81",
+    "current_part_index": 0,
+    "state": "awaiting_clarification_feedback",
+    "matched_part_ids": [
+      "prt_5d3864bc2f114c81",
+      "prt_dba57897e1ef4b6a",
+      "prt_2a8be689975747e1",
+      "prt_eec967b81068463a",
+      "prt_c91a22d8bda74363",
+      "prt_7108231784bd4ee3",
+      "prt_6bd08eec6e844c80"
+    ],
+    "confidence": 1.0,
+    "memory": {
+      "current_topic": "linear algebra foundations for machine learning",
+      "current_step": "part 0: Why ML needs math",
+      "last_user_message": "Well, can you do that?",
+      "last_assistant_answer": "Absolutely, Ayush! Let's break it down step by step. First, imagine we have an image of a dog. Each pixel in that image has a color value, and when we arrange these pixels in a grid, we can represent the entire image as a matrix. For instance, if we take a black-and-white image, each pixel can be a number from 0 to 255, where 0 is black and 255 is white. Now, when we want to analyze this image, we can perform mathematical operations on this matrix. For example, we can apply filters to enhance certain features, like edges, which helps in distinguishing between a dog and a cat. This is where linear algebra shines! It allows us to manipulate these matrices to extract meaningful patterns. Does that clarify how we can analyze images mathematically?",
+      "last_visual_plan": [
+        {
+          "start": 0.0,
+          "end": 4.0,
+          "cue": "Show an image of a dog, then overlay a grid of pixels on top of it, highlighting individual pixels."
+        },
+        {
+          "start": 4.0,
+          "end": 8.0,
+          "cue": "Transform the grid into a matrix format, labeling rows and columns, with numbers appearing to represent pixel values."
+        },
+        {
+          "start": 8.0,
+          "end": 12.0,
+          "cue": "Highlight specific entries in the matrix to show how they correspond to pixel values, using a color gradient."
+        },
+        {
+          "start": 12.0,
+          "end": 16.0,
+          "cue": "Show arrows indicating mathematical operations being applied to the matrix, such as filtering or edge detection."
+        },
+        {
+          "start": 16.0,
+          "end": 20.0,
+          "cue": "Introduce the term 'Linear Algebra' with a visual emphasis, showing its connection to the matrix operations."
+        }
+      ],
+      "student_understanding_summary": "The student is starting to understand how images are represented as matrices and how linear algebra helps in analyzing them.",
+      "unresolved_student_question": "Well, can you do that?",
+      "next_teaching_goal": "Would you like to see how these operations help in recognizing different objects in images?",
+      "recent_turns": [
+        {
+          "role": "student",
+          "content": "linear algebra foundations for machine learning",
+          "created_at": "2026-04-30T21:53:03.320687+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "Is there anything in this part that you didn't understand?",
+          "created_at": "2026-04-30T21:54:13.528375+00:00"
+        },
+        {
+          "role": "student",
+          "content": "Well, I just want you to know how does computer analysis images or videos?",
+          "created_at": "2026-04-30T21:54:34.079850+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "Great question, Ayush! When we analyze images or videos, we first convert them into numerical data that a computer can understand. Think of an image as a grid of pixels, where each pixel has a color value. This grid can be represented as a matrix, where each entry corresponds to a pixel's intensity or color. For example, a black-and-white image can be represented as a matrix of numbers ranging from 0 to 255, where 0 is black and 255 is white. Once we have this numerical representation, we can apply mathematical operations to identify patterns, like distinguishing between a dog and a cat. This is where linear algebra comes in, allowing us to manipulate these matrices to extract meaningful features. Does that make sense?\n\nDo you want to dive deeper into how these mathematical operations help in recognizing different objects in images?",
+          "created_at": "2026-04-30T21:54:58.713508+00:00"
+        },
+        {
+          "role": "student",
+          "content": "Well, can you do that?",
+          "created_at": "2026-04-30T21:56:25.453055+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "Absolutely, Ayush! Let's break it down step by step. First, imagine we have an image of a dog. Each pixel in that image has a color value, and when we arrange these pixels in a grid, we can represent the entire image as a matrix. For instance, if we take a black-and-white image, each pixel can be a number from 0 to 255, where 0 is black and 255 is white. Now, when we want to analyze this image, we can perform mathematical operations on this matrix. For example, we can apply filters to enhance certain features, like edges, which helps in distinguishing between a dog and a cat. This is where linear algebra shines! It allows us to manipulate these matrices to extract meaningful patterns. Does that clarify how we can analyze images mathematically?\n\nWould you like to see how these operations help in recognizing different objects in images?",
+          "created_at": "2026-04-30T21:57:10.155130+00:00"
+        }
+      ],
+      "updated_at": "2026-04-30T21:57:10.159340+00:00"
+    },
+    "created_at": "2026-04-30T21:52:31.894355+00:00",
+    "updated_at": "2026-04-30T21:57:10.160443+00:00"
+  },
+  {
+    "id": "ses_b995421ae88a4690",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "Well I want to learn how does my Dekondiya contributes to the energy production of the cell",
+    "mode": "persona_only",
+    "current_roadmap_id": null,
+    "current_part_id": null,
+    "current_part_index": 0,
+    "state": "persona_only_teaching",
+    "matched_part_ids": [],
+    "confidence": 0.0,
+    "memory": {
+      "current_topic": "Mitochondria and cellular energy production",
+      "current_step": "Introduce the mitochondria as the cell's powerhouse and explain ATP as usable energy",
+      "last_user_message": "Yes.",
+      "last_assistant_answer": "Yes, Ayush — let’s start with the basics. I think you mean the mitochondria, the tiny powerhouses inside the cell. Their job is to help turn food energy into ATP, which is the cell’s usable energy. Here is the simple flow: glucose comes in from food, oxygen comes in from breathing, and inside the mitochondria these are processed step by step. That process makes ATP, like charging a battery for the cell. So the key idea is: mitochondria do not create energy from nothing — they convert energy stored in food into a form the cell can use immediately. If you want, next I can show you the full pathway in a very visual way: glucose to mitochondria to ATP.",
+      "last_visual_plan": [
+        {
+          "start": 0.0,
+          "end": 3.5,
+          "cue": "A cell appears as a soft rounded shape. A small glowing mitochondrion slides into view and gently pulses to signal importance."
+        },
+        {
+          "start": 3.5,
+          "end": 7.5,
+          "cue": "The mitochondrion enlarges and is labeled as the powerhouse. An arrow points from it to a battery icon labeled ATP, which lights up as the mitochondrion pulses."
+        },
+        {
+          "start": 7.5,
+          "end": 12.0,
+          "cue": "Two arrows enter the cell from opposite sides: one labeled glucose, one labeled oxygen. They move toward the mitochondrion, showing inputs arriving."
+        },
+        {
+          "start": 12.0,
+          "end": 17.0,
+          "cue": "The mitochondrion emits a sequence of small moving energy sparks that transform into a bright ATP battery, illustrating energy conversion rather than creation."
+        },
+        {
+          "start": 17.0,
+          "end": 22.0,
+          "cue": "The ATP battery fills from empty to full with a smooth animation. The cell around it subtly glows to show usable energy for cell work."
+        },
+        {
+          "start": 22.0,
+          "end": 26.0,
+          "cue": "The glucose, oxygen, mitochondrion, and ATP battery align in one clean flow diagram, ready for the next lesson step."
+        }
+      ],
+      "student_understanding_summary": "The student is asking for an introduction to how mitochondria contribute to energy production in cells and needs a simple, intuitive explanation first.",
+      "unresolved_student_question": "How do mitochondria actually convert food and oxygen into ATP inside the cell?",
+      "next_teaching_goal": "Would you like me to explain the full ATP-making pathway next, step by step, in the mitochondria?",
+      "recent_turns": [
+        {
+          "role": "student",
+          "content": "Well I want to learn how does my Dekondiya contributes to the energy production of the cell",
+          "created_at": "2026-05-01T07:46:08.930252+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "I haven't uploaded a video on Well I want to learn how does my Dekondiya contributes to the energy production of the cell yet, but I can still explain it in my teaching style. Want me to go ahead?",
+          "created_at": "2026-05-01T07:46:08.957499+00:00"
+        },
+        {
+          "role": "student",
+          "content": "Please.",
+          "created_at": "2026-05-01T07:46:27.814498+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "Just to confirm: should I go ahead and teach this in my style? (yes/no)",
+          "created_at": "2026-05-01T07:46:27.827610+00:00"
+        },
+        {
+          "role": "student",
+          "content": "Yes.",
+          "created_at": "2026-05-01T07:46:42.149452+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "Yes, Ayush — let’s start with the basics. I think you mean the mitochondria, the tiny powerhouses inside the cell. Their job is to help turn food energy into ATP, which is the cell’s usable energy. Here is the simple flow: glucose comes in from food, oxygen comes in from breathing, and inside the mitochondria these are processed step by step. That process makes ATP, like charging a battery for the cell. So the key idea is: mitochondria do not create energy from nothing — they convert energy stored in food into a form the cell can use immediately. If you want, next I can show you the full pathway in a very visual way: glucose to mitochondria to ATP.\n\nWould you like me to explain the full ATP-making pathway next, step by step, in the mitochondria?",
+          "created_at": "2026-05-01T07:47:17.170983+00:00"
+        }
+      ],
+      "updated_at": "2026-05-01T07:47:17.179884+00:00"
+    },
+    "created_at": "2026-05-01T07:45:29.091636+00:00",
+    "updated_at": "2026-05-01T07:47:17.179927+00:00"
+  },
+  {
+    "id": "ses_5147a4596eba49ef",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "Well, I want to learn how this might want you to be the power of the self",
+    "mode": "persona_only",
+    "current_roadmap_id": null,
+    "current_part_id": null,
+    "current_part_index": 0,
+    "state": "persona_only_teaching",
+    "matched_part_ids": [],
+    "confidence": 0.017,
+    "memory": {
+      "current_topic": "Powerhouse of the cell: mitochondrion",
+      "current_step": "Three-step overview of ATP production",
+      "last_user_message": "No, I just want to know the three step one. Well, I just want to know three step one.",
+      "last_assistant_answer": "Yes — I think you want the **three steps** of how the mitochondrion makes energy. Step one: **food breaks down** into a smaller fuel. Step two: the mitochondrion **uses that fuel** to make ATP. Step three: **ATP powers the cell** so it can move, grow, and repair. So the short chain is: **food in → ATP made → cell work happens**. Think of it like a power station: fuel goes in, electricity comes out, and then the city can run. If you want, I can next explain those three steps with a very simple picture of glucose, oxygen, and ATP.",
+      "last_visual_plan": [
+        {
+          "start": 0.0,
+          "end": 4.0,
+          "cue": "A cell outline appears. Inside it, a glowing mitochondrion lights up. Three numbered dots appear beside it: 1, 2, 3, suggesting a simple sequence."
+        },
+        {
+          "start": 4.0,
+          "end": 8.0,
+          "cue": "A food icon labeled 'food' moves toward the mitochondrion and splits into a smaller fuel dot. An arrow shows the first step going inward."
+        },
+        {
+          "start": 8.0,
+          "end": 13.0,
+          "cue": "Inside the mitochondrion, the fuel dot transforms into three small ATP dots. The mitochondrion pulses brighter as the ATP dots appear."
+        },
+        {
+          "start": 13.0,
+          "end": 18.0,
+          "cue": "The ATP dots travel outward to three simple activity icons: move, grow, repair. Each icon lights up as ATP reaches it, showing cause and effect."
+        },
+        {
+          "start": 18.0,
+          "end": 24.0,
+          "cue": "The full flow appears as a clean animated chain: food in → mitochondrion → ATP → cell actions. The arrows briefly glow in order from left to right."
+        }
+      ],
+      "student_understanding_summary": "The student wants only the three-step version, without extra comparison or deeper detail.",
+      "unresolved_student_question": "They asked for the 'three step one' of the powerhouse of the cell.",
+      "next_teaching_goal": "Do you want me to explain the three steps a little more clearly with the words glucose, oxygen, and ATP?",
+      "recent_turns": [
+        {
+          "role": "student",
+          "content": "Yes. Yes, please.",
+          "created_at": "2026-05-01T07:53:43.408452+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "Yes — let’s do it. I think the phrase you want is: **the power of the self**. In simple terms, that means your ability to think, choose, learn, and change your own life. I’ll break it into three parts. First: **the self** — that is you, your mind, your habits, your identity. Second: **power** — your capacity to act, decide, and influence outcomes. Third: **the power of the self** — the idea that growth starts when you can guide your own attention, emotions, and actions. A vivid way to think about it: your mind is like a control panel. If your attention is scattered, your decisions are noisy. If you can direct it well, you become more effective. So the core lesson is this: self-power is not magic. It is built through small repeated choices — focus, discipline, reflection, and learning. That is how a person becomes stronger from the inside out. If you want, next I can turn this into a very simple example from daily life or from machine learning, so it feels more concrete.\n\nWould you like me to give you a simple daily-life example next, or connect this idea to machine learning?",
+          "created_at": "2026-05-01T07:54:18.438639+00:00"
+        },
+        {
+          "role": "student",
+          "content": "Well, I wanted to learn about my to conduit the powerhouse of the cell.",
+          "created_at": "2026-05-01T07:55:45.716915+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "Ah — I think you mean **the powerhouse of the cell**. That is **the mitochondrion**. Let’s do this step by step. First, the cell is like a tiny city. The mitochondrion is the part that helps make the cell’s energy, in the form of ATP. So when we say “powerhouse,” we mean the place where usable energy is produced. Here is the simple idea: food gives the cell fuel, and the mitochondrion turns that fuel into energy the cell can use to move, build, and repair itself. So if the nucleus is like the control center, the mitochondrion is more like the power station. A vivid image: think of a phone. The battery does not write the code or make the apps, but it gives the power that lets everything run. Same idea here. If you want, I can next explain **how mitochondria make ATP** in a very simple three-step story.\n\nWould you like me to explain next how mitochondria make ATP in three simple steps, or should I compare mitochondria with chloroplasts too?",
+          "created_at": "2026-05-01T07:56:14.528136+00:00"
+        },
+        {
+          "role": "student",
+          "content": "No, I just want to know the three step one. Well, I just want to know three step one.",
+          "created_at": "2026-05-01T07:57:46.687838+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "Yes — I think you want the **three steps** of how the mitochondrion makes energy. Step one: **food breaks down** into a smaller fuel. Step two: the mitochondrion **uses that fuel** to make ATP. Step three: **ATP powers the cell** so it can move, grow, and repair. So the short chain is: **food in → ATP made → cell work happens**. Think of it like a power station: fuel goes in, electricity comes out, and then the city can run. If you want, I can next explain those three steps with a very simple picture of glucose, oxygen, and ATP.\n\nDo you want me to explain the three steps a little more clearly with the words glucose, oxygen, and ATP?",
+          "created_at": "2026-05-01T07:58:10.436392+00:00"
+        }
+      ],
+      "updated_at": "2026-05-01T07:58:10.447620+00:00"
+    },
+    "created_at": "2026-05-01T07:51:23.773028+00:00",
+    "updated_at": "2026-05-01T07:58:10.447674+00:00"
+  },
+  {
+    "id": "ses_1e7481e11b604479",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "Well, I want to learn linear algebra foundations for machine learning",
+    "mode": "video_context",
+    "current_roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "current_part_id": "prt_dba57897e1ef4b6a",
+    "current_part_index": 1,
+    "state": "playing_video_part",
+    "matched_part_ids": [
+      "prt_5d3864bc2f114c81",
+      "prt_dba57897e1ef4b6a",
+      "prt_2a8be689975747e1",
+      "prt_eec967b81068463a",
+      "prt_c91a22d8bda74363",
+      "prt_7108231784bd4ee3",
+      "prt_6bd08eec6e844c80"
+    ],
+    "confidence": 1.0,
+    "memory": {
+      "current_topic": "Well, I want to learn linear algebra foundations for machine learning",
+      "current_step": "part 1: Linear algebra objects",
+      "last_user_message": "No, I want to continue with the next part of the lesson.",
+      "last_assistant_answer": "Yes, absolutely, Ayush. Let us build the foundation carefully. First, a scalar is just one number — like 7, or 0.2, or the brightness of one pixel. Second, a vector is a list of numbers — like [2, 5, 1]. In machine learning, a vector often represents one example or one feature set. Third, a matrix is a table of numbers — rows and columns — and in ML it often represents many examples together, or a transformation that changes one vector into another. A simple image example helps: one image can be flattened into a vector, and then a matrix can process that vector to detect patterns like edges or shapes. So the big idea is: scalar is one number, vector is a data point, matrix is a machine that transforms data. If this is clear, next I can show you a tiny image example and how a matrix acts on a vector step by step.",
+      "last_visual_plan": [
+        {
+          "start": 0.0,
+          "end": 5.0,
+          "cue": "Show one glowing dot labeled '7' on the left. It pulses once to emphasize a single value, with a short caption 'scalar = one number'."
+        },
+        {
+          "start": 5.0,
+          "end": 11.0,
+          "cue": "Transform the single dot into a short horizontal row of three or four dots with labels like 2, 5, 1. Add a bracket-like line or container to suggest one ordered list."
+        },
+        {
+          "start": 11.0,
+          "end": 18.0,
+          "cue": "Expand the vector into a 2x3 grid of dots inside a rectangle. Highlight rows and columns in sequence to show the table structure."
+        },
+        {
+          "start": 18.0,
+          "end": 26.0,
+          "cue": "Place a simple arrow from the vector into the matrix, then out to a new transformed vector on the right. Animate the output vector changing direction and color to show transformation."
+        },
+        {
+          "start": 26.0,
+          "end": 34.0,
+          "cue": "Show a tiny 3x3 pixel grid icon on the far left, then flatten it into a row vector in the center. Use a smooth morph animation and briefly highlight that the image becomes numbers."
+        },
+        {
+          "start": 34.0,
+          "end": 42.0,
+          "cue": "Overlay a simple filter-like matrix beside the vector and animate a scanning motion across the flattened image vector, with a highlight that suggests pattern detection like edges."
+        }
+      ],
+      "student_understanding_summary": "The student understands that raw data becomes numbers, and now needs the basic building blocks: scalar, vector, and matrix, connected to a tiny machine learning example.",
+      "unresolved_student_question": "",
+      "next_teaching_goal": "Continue to the next uploaded teacher video part.",
+      "recent_turns": [
+        {
+          "role": "assistant",
+          "content": "Is there anything in this part that you didn't understand?",
+          "created_at": "2026-05-01T08:00:43.675291+00:00"
+        },
+        {
+          "role": "student",
+          "content": "Well in the video you refer to data as the high dimension form of data. Can you explain that to me?",
+          "created_at": "2026-05-01T08:01:04.367918+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "Yes, good question, Ayush. When I say data is in a high-dimensional form, I mean each example is described by many numbers, not just one or two. Think of a cat image. One image can be turned into a long vector of pixel values. If the image is 28 by 28, that is already 784 numbers. So one picture is one point in a 784-dimensional space. For text, we do something similar. A sentence can become a vector of word features or embeddings. For audio, we may use many time-frequency values. So the raw thing looks simple to us, but for the computer it becomes a point with many coordinates. That is why linear algebra matters: vectors hold the data, matrices transform it, and models learn patterns in that high-dimensional space. If you want, next I can show you the difference between a scalar, a vector, and a matrix using one tiny machine learning example.\n\nWould you like me to next explain scalar, vector, and matrix with one tiny ML example, like a single image pixel row?",
+          "created_at": "2026-05-01T08:01:31.713670+00:00"
+        },
+        {
+          "role": "student",
+          "content": "Yes, please, please do that.",
+          "created_at": "2026-05-01T08:02:48.822408+00:00"
+        },
+        {
+          "role": "assistant",
+          "content": "Yes, absolutely, Ayush. Let us build the foundation carefully. First, a scalar is just one number — like 7, or 0.2, or the brightness of one pixel. Second, a vector is a list of numbers — like [2, 5, 1]. In machine learning, a vector often represents one example or one feature set. Third, a matrix is a table of numbers — rows and columns — and in ML it often represents many examples together, or a transformation that changes one vector into another. A simple image example helps: one image can be flattened into a vector, and then a matrix can process that vector to detect patterns like edges or shapes. So the big idea is: scalar is one number, vector is a data point, matrix is a machine that transforms data. If this is clear, next I can show you a tiny image example and how a matrix acts on a vector step by step.\n\nWould you like me to show you next how a matrix multiplies a vector using a tiny real ML-style example?",
+          "created_at": "2026-05-01T08:03:19.686099+00:00"
+        },
+        {
+          "role": "student",
+          "content": "No, I want to continue with the next part of the lesson.",
+          "created_at": "2026-05-01T08:04:45.887233+00:00"
+        }
+      ],
+      "updated_at": "2026-05-01T08:04:45.938062+00:00"
+    },
+    "created_at": "2026-05-01T07:59:03.410776+00:00",
+    "updated_at": "2026-05-01T08:04:45.938102+00:00"
+  },
+  {
+    "id": "ses_e95fc009c934423f",
+    "student_id": "usr_3b1e7ce69ca44a39",
+    "persona_id": "per_0746a728bc584fad",
+    "selected_topic": "linear algebra foundations for machine learning",
+    "mode": "video_context",
+    "current_roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "current_part_id": "prt_5d3864bc2f114c81",
+    "current_part_index": 0,
+    "state": "playing_video_part",
+    "matched_part_ids": [
+      "prt_5d3864bc2f114c81",
+      "prt_dba57897e1ef4b6a",
+      "prt_2a8be689975747e1",
+      "prt_eec967b81068463a",
+      "prt_c91a22d8bda74363",
+      "prt_7108231784bd4ee3",
+      "prt_6bd08eec6e844c80"
+    ],
+    "confidence": 1.0,
+    "memory": {
+      "current_topic": "linear algebra foundations for machine learning",
+      "current_step": "part 0: Why ML needs math",
+      "last_user_message": "linear algebra foundations for machine learning",
+      "last_assistant_answer": "Hey Ayush, I am Fang-Fang lee. I am a Mathematics professor and AI/Ml Engineer. I know topics like Mathematics, Machine, learning, linear algebra foundations for machine learning and vectorization of raw data. What do you want to learn today?",
+      "last_visual_plan": [],
+      "student_understanding_summary": "Awaiting the student's response to the latest explanation.",
+      "unresolved_student_question": "linear algebra foundations for machine learning",
+      "next_teaching_goal": "Play the original uploaded teacher video part before asking for questions.",
+      "recent_turns": [
+        {
+          "role": "assistant",
+          "content": "Hey Ayush, I am Fang-Fang lee. I am a Mathematics professor and AI/Ml Engineer. I know topics like Mathematics, Machine, learning, linear algebra foundations for machine learning and vectorization of raw data. What do you want to learn today?",
+          "created_at": "2026-05-01T11:40:08.216425+00:00"
+        },
+        {
+          "role": "student",
+          "content": "linear algebra foundations for machine learning",
+          "created_at": "2026-05-01T11:40:40.017059+00:00"
+        }
+      ],
+      "updated_at": "2026-05-01T11:40:40.039105+00:00"
+    },
+    "created_at": "2026-05-01T11:40:08.212908+00:00",
+    "updated_at": "2026-05-01T11:40:40.039125+00:00"
+  }
+]

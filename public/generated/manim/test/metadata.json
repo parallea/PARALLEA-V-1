@@ -1,0 +1,15 @@
+{
+  "key": "test",
+  "scene_name": "GeneratedScene",
+  "segment_id": "healthcheck_text",
+  "frame_number": 0,
+  "video_path": "D:\\copy\\to be deployed\\0 - Copy\\public\\generated\\manim\\test\\scene.mp4",
+  "video_url": "/generated/manim/test/scene.mp4?v=1777579036",
+  "scene_path": "D:\\copy\\to be deployed\\0 - Copy\\public\\generated\\manim\\test\\scene.py",
+  "render_log": "D:\\copy\\to be deployed\\0 - Copy\\public\\generated\\manim\\test\\render.log",
+  "command": "\"D:\\copy\\to be deployed\\0 - Copy\\.venv\\Scripts\\python.exe\" -m manim -ql \"D:\\copy\\to be deployed\\0 - Copy\\manim_runtime\\scenes\\test.py\" GeneratedScene --media_dir \"D:\\copy\\to be deployed\\0 - Copy\\manim_runtime\\health\" --output_file scene.mp4 --disable_caching --format mp4",
+  "render_time_sec": 4.118,
+  "used_fallback": false,
+  "latex_available": false,
+  "text_only_mode": true
+}

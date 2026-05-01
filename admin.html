@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin - Parallea</title>
+<style>
+  :root {
+    color-scheme: light;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f6f7f9;
+    color: #1b1f24;
+  }
+  body {
+    margin: 0;
+  }
+  main {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 32px 20px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 22px;
+  }
+  h1 {
+    margin: 0;
+    font-size: 28px;
+  }
+  a, button {
+    border: 1px solid #1f2937;
+    border-radius: 6px;
+    background: #1f2937;
+    color: white;
+    padding: 9px 13px;
+    text-decoration: none;
+    font: inherit;
+    cursor: pointer;
+  }
+  .status {
+    border: 1px solid #d4d8df;
+    border-radius: 8px;
+    background: white;
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+  .muted {
+    color: #687282;
+  }
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid #d4d8df;
+    border-radius: 8px;
+    background: white;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 980px;
+  }
+  th, td {
+    border-bottom: 1px solid #e6e8ec;
+    padding: 11px 12px;
+    text-align: left;
+    vertical-align: top;
+    white-space: nowrap;
+  }
+  th {
+    background: #f0f2f5;
+    color: #374151;
+    font-size: 13px;
+  }
+  td {
+    font-size: 14px;
+  }
+  tr:last-child td {
+    border-bottom: 0;
+  }
+  .num {
+    text-align: right;
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Admin</h1>
+      <div class="muted" id="adminIdentity"></div>
+    </div>
+    <a href="/auth/login" id="loginLink">Sign in</a>
+  </header>
+
+  <section class="status" id="status">Loading...</section>
+  <section class="table-wrap" id="tableWrap" hidden>
+    <table>
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Name</th>
+          <th class="num">Sessions</th>
+          <th class="num">Questions</th>
+          <th>First login</th>
+          <th>Last login</th>
+          <th>Last session</th>
+          <th>Last question</th>
+        </tr>
+      </thead>
+      <tbody id="analyticsRows"></tbody>
+    </table>
+  </section>
+</main>
+
+<script>
+(function () {
+  const statusEl = document.getElementById("status");
+  const tableWrap = document.getElementById("tableWrap");
+  const rowsEl = document.getElementById("analyticsRows");
+  const loginLink = document.getElementById("loginLink");
+  const identityEl = document.getElementById("adminIdentity");
+
+  function setStatus(text) {
+    statusEl.textContent = text;
+    statusEl.hidden = !text;
+  }
+
+  function dateValue(value) {
+    if (!value) return "";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString();
+  }
+
+  function cell(text, className) {
+    const td = document.createElement("td");
+    td.textContent = text == null ? "" : String(text);
+    if (className) td.className = className;
+    return td;
+  }
+
+  async function jsonFetch(url) {
+    const response = await fetch(url, { credentials: "same-origin" });
+    let body = {};
+    try { body = await response.json(); } catch (_) { body = {}; }
+    return { ok: response.ok, status: response.status, body };
+  }
+
+  async function load() {
+    const me = await jsonFetch("/api/auth/me");
+    const user = me.body && me.body.user;
+    if (!user) {
+      loginLink.hidden = false;
+      identityEl.textContent = "";
+      setStatus("Sign in to view admin data.");
+      return;
+    }
+
+    loginLink.hidden = true;
+    identityEl.textContent = user.email || user.name || "";
+    if (!user.isAdmin) {
+      setStatus("You do not have admin access");
+      return;
+    }
+
+    const analytics = await jsonFetch("/api/admin/user-analytics");
+    if (!analytics.ok) {
+      setStatus(analytics.body.detail || "Admin data is unavailable.");
+      return;
+    }
+
+    const rows = Array.isArray(analytics.body.analytics) ? analytics.body.analytics : [];
+    rowsEl.textContent = "";
+    rows.forEach((row) => {
+      const tr = document.createElement("tr");
+      tr.append(
+        cell(row.email),
+        cell(row.name),
+        cell(row.total_sessions || 0, "num"),
+        cell(row.total_questions || 0, "num"),
+        cell(dateValue(row.first_login_at)),
+        cell(dateValue(row.last_login_at)),
+        cell(dateValue(row.last_session_at)),
+        cell(dateValue(row.last_question_at))
+      );
+      rowsEl.appendChild(tr);
+    });
+    tableWrap.hidden = false;
+    setStatus(rows.length ? "" : "No analytics rows yet.");
+  }
+
+  load().catch(() => {
+    setStatus("Admin data is unavailable.");
+  });
+})();
+</script>
+</body>
+</html>

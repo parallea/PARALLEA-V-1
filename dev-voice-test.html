@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Voice Test · Parallea</title>
+<style>
+body{margin:0;background:#0b0f15;color:#edf2f7;font:14px system-ui,sans-serif}
+main{max-width:860px;margin:0 auto;padding:28px;display:grid;gap:18px}
+button{border:1px solid #334155;background:#111827;color:#edf2f7;border-radius:10px;padding:10px 14px;font:inherit;cursor:pointer}
+button.active{border-color:#48c7b8;color:#48c7b8}
+.meter{height:10px;background:#020617;border:1px solid #334155;border-radius:999px;overflow:hidden}.meter span{display:block;height:100%;width:0;background:linear-gradient(90deg,#48c7b8,#7bb7ff)}
+pre{white-space:pre-wrap;background:#020617;border:1px solid #263241;border-radius:14px;padding:14px;min-height:180px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.card{background:#111827;border:1px solid #263241;border-radius:14px;padding:12px}.card b{display:block;color:#94a3b8;font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Voice Pipeline Test</h1>
+  <p>This page isolates browser VAD chunking from server STT. It records one utterance, sends the completed audio chunk to <code>/transcribe-question</code>, and shows the returned metadata.</p>
+  <button id="toggle">Start VAD test</button>
+  <div class="meter"><span id="meter"></span></div>
+  <div class="grid">
+    <div class="card"><b>VAD state</b><span id="vad">idle</span></div>
+    <div class="card"><b>Duration</b><span id="dur">0 ms</span></div>
+    <div class="card"><b>Blob</b><span id="blob">0 bytes</span></div>
+    <div class="card"><b>Chunks</b><span id="chunks">0</span></div>
+  </div>
+  <pre id="out">Ready.</pre>
+</main>
+<script>
+const cfg={pre:450,silence:1250,post:1000,timeslice:250,max:25000,min:800,minBytes:2048};
+let stream,ctx,analyser,src,rec,enabled=false,speaking=false,silenceSince=0,pending=false,flushing=false,finalizeAt=0,startAt=0,lastVoiceAt=0,pre=[],speech=[],header=null,threshold=.035,raf=0,mime='audio/webm';
+const $=id=>document.getElementById(id);
+function log(obj){$('out').textContent=typeof obj==='string'?obj:JSON.stringify(obj,null,2)}
+function setState(s){$('vad').textContent=s}
+function level(){if(!analyser)return 0;const d=new Uint8Array(analyser.fftSize);analyser.getByteTimeDomainData(d);let sum=0;for(const x of d){const v=(x-128)/128;sum+=v*v}return Math.sqrt(sum/d.length)}
+async function mic(){stream=await navigator.mediaDevices.getUserMedia({audio:true});ctx=new (window.AudioContext||window.webkitAudioContext)();src=ctx.createMediaStreamSource(stream);analyser=ctx.createAnalyser();analyser.fftSize=2048;src.connect(analyser)}
+function pick(){for(const t of ['audio/webm;codecs=opus','audio/webm'])if(MediaRecorder.isTypeSupported(t))return t;return ''}
+function trim(now){pre=pre.filter(x=>x.time>=now-cfg.pre)}
+function recorder(){mime=pick();rec=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream);mime=rec.mimeType||mime||'audio/webm';header=null;rec.ondataavailable=e=>{if(!e.data||!e.data.size)return;const item={blob:e.data,time:performance.now()};if(!header)header=item;if(speaking||pending||flushing)speech.push(item);else{pre.push(item);trim(item.time)}};rec.start(cfg.timeslice);log({event:'recorder_started',mime,timeslice:cfg.timeslice})}
+async function flush(){if(!rec||rec.state!=='recording')return;await new Promise(resolve=>{let done=false;const finish=()=>{if(done)return;done=true;resolve()};try{rec.addEventListener('dataavailable',finish,{once:true});rec.requestData()}catch(_){finish()}setTimeout(finish,cfg.timeslice+350)})}
+async function calibrate(){const a=[],st=performance.now();while(performance.now()-st<650){a.push(level());await new Promise(r=>requestAnimationFrame(r))}a.sort((x,y)=>x-y);const med=a[Math.floor(a.length*.5)]||.008,hi=a[Math.floor(a.length*.9)]||med;threshold=Math.min(.09,Math.max(med*3.2,hi*1.75,.018))}
+function begin(l){speaking=true;pending=false;flushing=false;silenceSince=0;startAt=performance.now();lastVoiceAt=startAt;trim(startAt);speech=pre.slice();pre=[];setState('speaking');log({event:'speech_start',level:l,threshold,mime})}
+async function finish(reason){speaking=false;flushing=true;setState('processing');await flush();flushing=false;pending=false;let blobs=speech.map(x=>x.blob).filter(Boolean);speech=[];if(header&&mime.includes('webm')&&blobs[0]!==header.blob)blobs.unshift(header.blob);const blob=new Blob(blobs,{type:mime});const duration=Math.round((lastVoiceAt-startAt)+cfg.pre+cfg.post);$('dur').textContent=duration+' ms';$('blob').textContent=blob.size+' bytes';$('chunks').textContent=blobs.length;if(blob.size<cfg.minBytes||duration<cfg.min){log({event:'rejected_before_upload',reason,blobSize:blob.size,duration,chunks:blobs.length,mime});setState('listening');return}const fd=new FormData();fd.append('audio',blob,'dev-voice-test.webm');fd.append('client_duration_ms',String(duration));fd.append('client_mime_type',mime);fd.append('client_sample_rate',String(ctx.sampleRate));fd.append('client_chunks',String(blobs.length));fd.append('client_session_state','dev_voice_test');const res=await fetch('/transcribe-question',{method:'POST',body:fd});log(await res.json());setState('listening')}
+function loop(){if(!enabled)return;const l=level(),now=performance.now();$('meter').style.width=Math.min(100,Math.round(l/Math.max(threshold*2.2,.02)*100))+'%';if(l>threshold){lastVoiceAt=now;silenceSince=0;if(pending){pending=false;finalizeAt=0}if(!speaking)begin(l);if(speaking&&now-startAt>cfg.max)finish('max')}else if(speaking){if(!silenceSince)silenceSince=now;if(!pending&&now-silenceSince>=cfg.silence){pending=true;finalizeAt=now+cfg.post;setState('post padding')}if(pending&&now>=finalizeAt)finish('silence')}raf=requestAnimationFrame(loop)}
+$('toggle').onclick=async()=>{enabled=!enabled;$('toggle').classList.toggle('active',enabled);$('toggle').textContent=enabled?'Stop VAD test':'Start VAD test';if(enabled){if(!stream){await mic();await calibrate();recorder()}setState('listening');loop()}else{cancelAnimationFrame(raf);if(rec&&rec.state!=='inactive')rec.stop();setState('idle')}};
+</script>
+</body>
+</html>

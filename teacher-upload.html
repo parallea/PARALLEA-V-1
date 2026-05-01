@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Upload video · Parallea</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/teacher.css">
+</head>
+<body>
+<div id="navMount"></div>
+<main>
+  <section class="t-page-head">
+    <div>
+      <p class="kicker">Upload</p>
+      <h1>Add a lesson video</h1>
+      <p>The first video creates your persona. Every video after that sharpens the same one.</p>
+    </div>
+    <a class="btn small" href="/teacher/dashboard">Back to dashboard</a>
+  </section>
+
+  <div class="split">
+    <form id="uploadForm" class="card" enctype="multipart/form-data">
+      <div class="card-head"><h2>New video</h2><span class="subtle">Audio is transcribed locally; the transcript drives persona + roadmap.</span></div>
+
+      <div class="upload-drop" id="drop">
+        <input type="file" id="fileInput" name="file" accept="video/*" hidden required>
+        <b id="fileLabel">Drop a video file or click to choose</b>
+        <small>.mp4, .mov, .webm, .mkv up to a few GB</small>
+      </div>
+
+      <div class="field" style="margin-top:18px"><label>Video title</label>
+        <input type="text" name="title" required placeholder="e.g. Projectile Motion — Equations &amp; Examples">
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Teacher / creator name</label><input type="text" name="teacher_name" placeholder="Leave blank to use your account name"></div>
+        <div class="field"><label>Profession</label><input type="text" name="profession" placeholder="e.g. Physics Teacher"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Subject / category</label><input type="text" name="subject" placeholder="e.g. Physics"></div>
+        <div class="field"><label>Description (optional)</label><input type="text" name="description" placeholder="Short summary"></div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;margin-top:8px">
+        <button class="btn primary" type="submit">Upload &amp; process</button>
+      </div>
+
+      <div id="uploadStatus" class="subtle" style="margin-top:14px"></div>
+      <div class="progress-bar" id="progress" hidden><span></span></div>
+    </form>
+
+    <div>
+      <div class="card">
+        <div class="card-head"><h3>What happens next?</h3></div>
+        <ol class="list-tight" style="padding-left:18px;margin:0">
+          <li>Audio is extracted and transcribed locally.</li>
+          <li>The transcript + your metadata is sent to the LLM.</li>
+          <li><b>If this is your first video:</b> a fresh persona prompt + roadmap is generated.</li>
+          <li><b>Otherwise:</b> your existing persona is updated and a new roadmap is added.</li>
+          <li>You'll see status updates here as it progresses.</li>
+        </ol>
+      </div>
+      <div class="card" style="margin-top:18px">
+        <div class="card-head"><h3>Tips</h3></div>
+        <ul class="bullets">
+          <li>Long videos work fine. Roadmap parts split it into 3-7 teaching segments.</li>
+          <li>Speak in your natural style — that's what the persona learns.</li>
+          <li>If LLM keys aren't configured, the platform still works in stub mode.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</main>
+<script src="/teacher.js"></script>
+<script>ParalleaTeacher.initUpload();</script>
+</body>
+</html>

@@ -1,0 +1,567 @@
+[
+  {
+    "id": "prt_fa3212d507da4519",
+    "roadmap_id": "rmp_3002b08a68c04240",
+    "part_id": "part_1",
+    "order": 0,
+    "title": "Introduction to Machine learning with mathematics",
+    "start_time": 0.0,
+    "end_time": 120.0,
+    "transcript_chunk": "(transcript stub)",
+    "summary": "Set up the core question and why it matters.",
+    "concepts": [
+      "Machine",
+      "learning",
+      "with"
+    ],
+    "equations": [],
+    "examples": [],
+    "suggested_visuals": [
+      "concept map"
+    ]
+  },
+  {
+    "id": "prt_cbfa2a32570e41f6",
+    "roadmap_id": "rmp_7eadab9570e64551",
+    "part_id": "part_1",
+    "order": 0,
+    "title": "Introduction to Mathematics in Machine Learning",
+    "start_time": 0.0,
+    "end_time": 120.0,
+    "transcript_chunk": "(transcript stub)",
+    "summary": "Set up the core question and why it matters.",
+    "concepts": [
+      "Mathematics",
+      "Machine",
+      "Learning"
+    ],
+    "equations": [],
+    "examples": [],
+    "suggested_visuals": [
+      "concept map"
+    ]
+  },
+  {
+    "id": "prt_demo_guitar_1",
+    "roadmap_id": "rmp_demo_guitar_lesson_1",
+    "part_id": "part_1",
+    "order": 0,
+    "title": "Introduction to guitar basics",
+    "start_time": 0,
+    "end_time": 90,
+    "transcript_chunk": "Choose the guitar that matches what is in your hands: steel acoustic, nylon acoustic, or electric.",
+    "summary": "Identify the type of guitar in the learner's hands and set a comfortable beginner mindset.",
+    "concepts": [
+      "guitar basics",
+      "steel acoustic",
+      "nylon acoustic",
+      "electric guitar"
+    ],
+    "equations": [],
+    "examples": [
+      "Match the body shape and strings to your instrument."
+    ],
+    "suggested_visuals": [
+      "side-by-side guitar type comparison"
+    ]
+  },
+  {
+    "id": "prt_demo_guitar_2",
+    "roadmap_id": "rmp_demo_guitar_lesson_1",
+    "part_id": "part_2",
+    "order": 1,
+    "title": "Holding the guitar and hand position",
+    "start_time": 90,
+    "end_time": 180,
+    "transcript_chunk": "Keep your thumb relaxed behind the neck so your fingers can curve cleanly over the strings.",
+    "summary": "Build a relaxed posture and learn where the fretting hand and strumming hand should sit.",
+    "concepts": [
+      "hand position",
+      "thumb behind neck",
+      "curved fingers",
+      "relaxed strumming hand"
+    ],
+    "equations": [],
+    "examples": [
+      "Rest the guitar body steadily before pressing any chord."
+    ],
+    "suggested_visuals": [
+      "guitar posture and hand placement diagram"
+    ]
+  },
+  {
+    "id": "prt_demo_guitar_3",
+    "roadmap_id": "rmp_demo_guitar_lesson_1",
+    "part_id": "part_3",
+    "order": 2,
+    "title": "Basic chords",
+    "start_time": 180,
+    "end_time": 330,
+    "transcript_chunk": "E minor uses two fingers. G major uses three fingers. C major teaches spacing and clean string control.",
+    "summary": "Learn the first open chord shapes: E minor, G major, and C major.",
+    "concepts": [
+      "basic chords",
+      "E minor",
+      "G major",
+      "C major",
+      "open chords"
+    ],
+    "equations": [],
+    "examples": [
+      "Place finger 2 and finger 3 on the second fret for E minor."
+    ],
+    "suggested_visuals": [
+      "open chord diagrams for Em, G, and C"
+    ]
+  },
+  {
+    "id": "prt_demo_guitar_4",
+    "roadmap_id": "rmp_demo_guitar_lesson_1",
+    "part_id": "part_4",
+    "order": 3,
+    "title": "Switching chords",
+    "start_time": 330,
+    "end_time": 450,
+    "transcript_chunk": "Move one finger at a time first, then try switching between shapes while keeping the hand relaxed.",
+    "summary": "Practice slow chord changes without rushing the strumming hand.",
+    "concepts": [
+      "switching chords",
+      "slow transitions",
+      "finger memory"
+    ],
+    "equations": [],
+    "examples": [
+      "Switch Em to G slowly before adding rhythm."
+    ],
+    "suggested_visuals": [
+      "step-by-step chord transition path"
+    ]
+  },
+  {
+    "id": "prt_demo_guitar_5",
+    "roadmap_id": "rmp_demo_guitar_lesson_1",
+    "part_id": "part_5",
+    "order": 4,
+    "title": "Strumming pattern",
+    "start_time": 450,
+    "end_time": 570,
+    "transcript_chunk": "Start with slow downstrokes, keep the wrist loose, and listen for every string to ring clearly.",
+    "summary": "Add a simple downstroke rhythm after the fretting hand feels stable.",
+    "concepts": [
+      "strumming pattern",
+      "downstrokes",
+      "rhythm",
+      "loose wrist"
+    ],
+    "equations": [],
+    "examples": [
+      "Four slow downstrokes per chord."
+    ],
+    "suggested_visuals": [
+      "animated downstroke rhythm pattern"
+    ]
+  },
+  {
+    "id": "prt_demo_guitar_6",
+    "roadmap_id": "rmp_demo_guitar_lesson_1",
+    "part_id": "part_6",
+    "order": 5,
+    "title": "Practice tips",
+    "start_time": 570,
+    "end_time": 720,
+    "transcript_chunk": "Press close to the fret wire, check one string at a time, and practice in short loops.",
+    "summary": "Use a short routine to avoid buzzing notes and build clean beginner habits.",
+    "concepts": [
+      "practice routine",
+      "beginner mistakes",
+      "buzzing notes",
+      "clean chord sound"
+    ],
+    "equations": [],
+    "examples": [
+      "Play each chord once, fix buzzing strings, then repeat for two minutes."
+    ],
+    "suggested_visuals": [
+      "practice checklist"
+    ]
+  },
+  {
+    "id": "prt_7c099085e946410b",
+    "roadmap_id": "rmp_17f9ba11c4df428f",
+    "part_id": "part_1",
+    "order": 0,
+    "title": "Why machine learning needs mathematics",
+    "start_time": 0.0,
+    "end_time": 70.0,
+    "transcript_chunk": "How does a machine learning model determine whether an image contains a dog or a cat? Computers cannot process images, texts, audio or videos directly like humans. Instead, we need to translate these inputs into a language they can understand, mathematics. This translation is made possible by the foundations of linear algebra.",
+    "summary": "The teacher opens with the question of how a model tells a dog from a cat, then explains that computers cannot understand raw images, text, audio, or video directly. Mathematics is introduced as the translation layer, with linear algebra as the foundation for representing and transforming data.",
+    "concepts": [
+      "machine learning input representation",
+      "mathematics as a translation layer",
+      "linear algebra foundation"
+    ],
+    "equations": [],
+    "examples": [
+      "image classification",
+      "images, text, audio, and video as data"
+    ],
+    "suggested_visuals": [
+      "Computer icons next to image/text/audio/video inputs",
+      "Arrow from raw data to mathematical representation"
+    ]
+  },
+  {
+    "id": "prt_4106b54280a642e3",
+    "roadmap_id": "rmp_17f9ba11c4df428f",
+    "part_id": "part_2",
+    "order": 1,
+    "title": "Data as scalars, vectors, matrices, and tensors",
+    "start_time": 70.0,
+    "end_time": 190.0,
+    "transcript_chunk": "Linear algebra helps convert data into mathematical objects through vectorization. In this process, raw data is expressed as objects such as scalar, vector, matrix or tensors format that a computer can process and reason about. There are four fundamental data types that form the foundations of linear algebra. Scalars, vector, matrix and tensor. A scalar is the simplest unit, a single number representing a magnitude or quantity. A vector extends this idea into one dimensional sequence or list of numbers. A matrix is a two dimensional structure composed of rows and columns. A tensor generalizes this idea in even higher dimensional space.",
+    "summary": "The lesson explains vectorization: turning raw data into scalar, vector, matrix, or tensor form so machines can compute with it. Each data type is defined intuitively, from a single number to multi-dimensional arrays, with images and TensorFlow used as examples.",
+    "concepts": [
+      "vectorization",
+      "scalar",
+      "vector",
+      "matrix",
+      "tensor",
+      "high-dimensional representation"
+    ],
+    "equations": [],
+    "examples": [
+      "number 5",
+      "float 2.6",
+      "pi",
+      "a list like 2, 3, 4",
+      "an image represented as a matrix",
+      "TensorFlow tensors"
+    ],
+    "suggested_visuals": [
+      "Four-panel diagram: scalar, vector, matrix, tensor",
+      "Image pixels shown as a matrix",
+      "3D-to-higher-dimension tensor illustration"
+    ]
+  },
+  {
+    "id": "prt_6b05b6a3022b459b",
+    "roadmap_id": "rmp_17f9ba11c4df428f",
+    "part_id": "part_3",
+    "order": 2,
+    "title": "Embeddings and similarity in ML",
+    "start_time": 190.0,
+    "end_time": 420.0,
+    "transcript_chunk": "Text can be tokenized and represented as a vector or numbers that captures its semantic meaning. We can compare how similar two sentences are by calculating distance between their respective vectors or embeddings. They can be measured by a number of distance metrics such as the Euclidean distance or cosine similarity. The Euclidean distance is a numeric measure between two vectors. The cosine similarity measures the angle between the two vectors. The closer the two vectors are in their semantic meaning, the smaller the angles will be.",
+    "summary": "The teacher shows how vector operations support practical ML tasks like text comparison. Sentences can be tokenized and turned into embeddings, then compared using Euclidean distance or cosine similarity. The segment explains both measures intuitively and connects vector geometry to semantic meaning.",
+    "concepts": [
+      "tokenization",
+      "embeddings",
+      "distance metrics",
+      "Euclidean distance",
+      "cosine similarity",
+      "dot product",
+      "vector geometry"
+    ],
+    "equations": [
+      "Euclidean distance",
+      "cosine similarity = dot(A, B) / (||A|| ||B||)"
+    ],
+    "examples": [
+      "comparing two sentences",
+      "semantic meaning in text embeddings",
+      "vectors at 90 degrees as independent features"
+    ],
+    "suggested_visuals": [
+      "Two vectors with an angle between them",
+      "Sentence embeddings plotted in space",
+      "Side-by-side Euclidean distance vs cosine similarity graphic"
+    ]
+  },
+  {
+    "id": "prt_b9761ee0fa314404",
+    "roadmap_id": "rmp_17f9ba11c4df428f",
+    "part_id": "part_4",
+    "order": 3,
+    "title": "Matrix operations and neural networks",
+    "start_time": 420.0,
+    "end_time": 490.0,
+    "transcript_chunk": "In machine learning, the vector dot product can be extended to matrix dot product. Matrix dot product is one of the most important operations in linear algebra. It is used in all kinds of neural networks ranging from simple vanilla neural net to state of the art transformer models.",
+    "summary": "The lesson transitions from vector dot products to matrix dot products, emphasizing matrix multiplication as one of the most important operations in linear algebra. It is presented as essential to neural networks, from simple models to transformers.",
+    "concepts": [
+      "matrix dot product",
+      "neural network computation",
+      "transformer models"
+    ],
+    "equations": [],
+    "examples": [
+      "vanilla neural net",
+      "state-of-the-art transformer models"
+    ],
+    "suggested_visuals": [
+      "Matrix multiplication diagram",
+      "Neural network layers connected by matrix operations"
+    ]
+  },
+  {
+    "id": "prt_fbf9cf93fbf34476",
+    "roadmap_id": "rmp_17f9ba11c4df428f",
+    "part_id": "part_5",
+    "order": 4,
+    "title": "SVD and dimensionality reduction",
+    "start_time": 490.0,
+    "end_time": 610.0,
+    "transcript_chunk": "Modern LLMs are trained on billions and billions of tokens and computations using all dimensions are impractical and inefficient. Instead, dimensionality reduction algorithms using linear algebra principles such as singular value decomposition or SVD allows us to perform matrix factorization, a process of breaking down a complex large matrix into smaller, more manageable and maintainable matrices such that they can be reconstructed back to form the large matrix. Using SVD, we can break down one single large matrix A into three smaller matrices U, sigma and V transposed.",
+    "summary": "The teacher explains why large-scale ML computations can be impractical and introduces dimensionality reduction through singular value decomposition. SVD is described as breaking a large matrix into three smaller matrices that can later reconstruct the original, while keeping only the most informative features.",
+    "concepts": [
+      "dimensionality reduction",
+      "singular value decomposition",
+      "matrix factorization",
+      "reconstruction",
+      "singular values"
+    ],
+    "equations": [
+      "A = U Σ V^T"
+    ],
+    "examples": [
+      "large language models trained on billions of tokens",
+      "reducing a large matrix into smaller matrices"
+    ],
+    "suggested_visuals": [
+      "Large matrix splitting into U, Σ, V^T",
+      "Before-and-after dimensionality reduction graphic"
+    ]
+  },
+  {
+    "id": "prt_9fd0cbfbdb69488c",
+    "roadmap_id": "rmp_17f9ba11c4df428f",
+    "part_id": "part_6",
+    "order": 5,
+    "title": "SVD example with a movie-rating matrix",
+    "start_time": 610.0,
+    "end_time": 670.0,
+    "transcript_chunk": "Let's think of A as a movie data set where it has rows and columns. So rows might represent user and the columns might represent the movies and the fields is populated with the user's rating of the movies. After vectorizing A into matrix into this large matrix, we can use SVD to break it down into three smaller matrices U sigma and V transposed. U is the left singular matrix. Sigma is a diagonal matrix. V transposed is the matrix that represents features in the column space or the movie space.",
+    "summary": "The teacher uses a movie dataset to make SVD more concrete: rows represent users, columns represent movies, and ratings fill the matrix. The explanation clarifies the role of U, Sigma, and V transpose, and concludes by summarizing why linear algebra is foundational for modern machine learning.",
+    "concepts": [
+      "user-item matrix",
+      "left singular matrix",
+      "diagonal matrix",
+      "column space",
+      "row space",
+      "feature extraction"
+    ],
+    "equations": [
+      "A = U Σ V^T"
+    ],
+    "examples": [
+      "movie ratings by users",
+      "reconstructing the original matrix from smaller matrices"
+    ],
+    "suggested_visuals": [
+      "Movie-rating matrix with users on rows and movies on columns",
+      "Three-matrix decomposition visualization"
+    ]
+  },
+  {
+    "id": "prt_5d3864bc2f114c81",
+    "roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "part_id": "part_1",
+    "order": 0,
+    "title": "Why ML needs math",
+    "start_time": 0.0,
+    "end_time": 70.0,
+    "transcript_chunk": "How does a machine learning model determine whether an image contains a dog or a cat? Computers cannot process images, texts, audio or videos directly like humans. Instead, we need to translate these inputs into a language they can understand, mathematics. This translation is made possible by the foundations of linear algebra.",
+    "summary": "The lesson opens by asking how a model tells a dog from a cat and answers that computers need mathematics to translate raw inputs into something they can compute on.",
+    "concepts": [
+      "machine learning inputs",
+      "mathematics as computation language",
+      "linear algebra foundation",
+      "data translation"
+    ],
+    "equations": [],
+    "examples": [
+      "dog vs cat image classification",
+      "images, text, audio, video"
+    ],
+    "suggested_visuals": [
+      "A raw image/text/audio icon transforming into numbers",
+      "Simple flow: data -> math -> model"
+    ]
+  },
+  {
+    "id": "prt_dba57897e1ef4b6a",
+    "roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "part_id": "part_2",
+    "order": 1,
+    "title": "Linear algebra objects",
+    "start_time": 70.0,
+    "end_time": 190.0,
+    "transcript_chunk": "Linear algebra helps convert data into mathematical objects through vectorization. Raw data is expressed as scalar, vector, matrix or tensors format that a computer can process and reason about. There are four fundamental data types that form the foundations of linear algebra.",
+    "summary": "The video introduces vectorization and the four core objects used to represent data: scalars, vectors, matrices, and tensors.",
+    "concepts": [
+      "vectorization",
+      "scalar",
+      "vector",
+      "matrix",
+      "tensor",
+      "high-dimensional representation"
+    ],
+    "equations": [],
+    "examples": [
+      "a single number like 5",
+      "a list like 2, 3, 4",
+      "an image as a pixel matrix",
+      "TensorFlow tensors"
+    ],
+    "suggested_visuals": [
+      "Four-box diagram for scalar/vector/matrix/tensor",
+      "Image represented as a matrix of pixels"
+    ]
+  },
+  {
+    "id": "prt_2a8be689975747e1",
+    "roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "part_id": "part_3",
+    "order": 2,
+    "title": "Comparing data with distances and similarity",
+    "start_time": 190.0,
+    "end_time": 420.0,
+    "transcript_chunk": "Text can be tokenized and represented as a vector or numbers that captures its semantic meaning. We can compare how similar two sentences are by calculating distance between their respective vectors or embeddings. They can be measured by a number of distance metrics such as the Euclidean distance or cosine similarity.",
+    "summary": "The lesson explains how text can be represented as vectors and compared with Euclidean distance and cosine similarity, then connects these ideas to dot products and independence of features.",
+    "concepts": [
+      "embeddings",
+      "Euclidean distance",
+      "cosine similarity",
+      "dot product",
+      "semantic similarity",
+      "feature independence"
+    ],
+    "equations": [
+      "Euclidean distance",
+      "cosine similarity = (A · B) / (||A|| ||B||)"
+    ],
+    "examples": [
+      "sentence embeddings",
+      "vectors A and B",
+      "orthogonal features"
+    ],
+    "suggested_visuals": [
+      "Two vectors on a plane with angle theta",
+      "Side-by-side Euclidean distance vs cosine similarity illustration"
+    ]
+  },
+  {
+    "id": "prt_eec967b81068463a",
+    "roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "part_id": "part_4",
+    "order": 3,
+    "title": "Matrix operations in neural networks",
+    "start_time": 420.0,
+    "end_time": 470.0,
+    "transcript_chunk": "In machine learning, the vector dot product can be extended to matrix dot product. Matrix dot product is one of the most important operations in linear algebra. It is used in all kinds of neural networks ranging from simple vanilla neural net to state of the art transformer models.",
+    "summary": "The video connects vector dot products to matrix dot products and explains that this operation is central to neural networks from basic models to transformers.",
+    "concepts": [
+      "matrix dot product",
+      "neural networks",
+      "transformer models",
+      "core linear algebra operations"
+    ],
+    "equations": [],
+    "examples": [
+      "vanilla neural net",
+      "transformer models"
+    ],
+    "suggested_visuals": [
+      "Matrix multiplication arrows",
+      "Neural network layers showing weight matrices"
+    ]
+  },
+  {
+    "id": "prt_c91a22d8bda74363",
+    "roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "part_id": "part_5",
+    "order": 4,
+    "title": "Dimensionality reduction with SVD",
+    "start_time": 470.0,
+    "end_time": 610.0,
+    "transcript_chunk": "Dimensionality reduction algorithms using linear algebra principles such as singular value decomposition or SVD allows us to perform matrix factorization, a process of breaking down a complex large matrix into smaller, more manageable and maintainable matrices such that they can be reconstructed back to form the large matrix. Using SVD, we can break down one single large matrix A into three smaller matrices U sigma and V transposed.",
+    "summary": "The lesson introduces SVD as a way to break large matrices into smaller pieces, keep only the most informative parts, and reconstruct the original matrix.",
+    "concepts": [
+      "dimensionality reduction",
+      "SVD",
+      "matrix factorization",
+      "reconstruction",
+      "singular values",
+      "orthogonal matrices",
+      "diagonal matrices"
+    ],
+    "equations": [
+      "A = UΣVᵀ"
+    ],
+    "examples": [
+      "large matrix A",
+      "U, Σ, and Vᵀ decomposition"
+    ],
+    "suggested_visuals": [
+      "Large matrix splitting into three smaller matrices",
+      "Diagonal sigma matrix highlighted"
+    ]
+  },
+  {
+    "id": "prt_7108231784bd4ee3",
+    "roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "part_id": "part_6",
+    "order": 5,
+    "title": "Movie ratings and recommendation systems",
+    "start_time": 610.0,
+    "end_time": 660.0,
+    "transcript_chunk": "Let's think of A as a movie data set where it has rows and columns. So rows might represent user and the columns might represent the movies and the fields is populated with the user's rating of the movies. After vectorizing A into matrix into this large matrix, we can use SVD to break it down into three smaller matrices U sigma and V transposed.",
+    "summary": "SVD is illustrated with a movie ratings matrix, where rows represent users and columns represent movies, showing how factorization captures user and movie features.",
+    "concepts": [
+      "movie ratings matrix",
+      "row space",
+      "column space",
+      "user space",
+      "movie space",
+      "recommendation systems"
+    ],
+    "equations": [
+      "A = UΣVᵀ"
+    ],
+    "examples": [
+      "user ratings of movies",
+      "user features in U",
+      "movie features in Vᵀ"
+    ],
+    "suggested_visuals": [
+      "Ratings table with users and movies",
+      "User/movie latent factors diagram"
+    ]
+  },
+  {
+    "id": "prt_6bd08eec6e844c80",
+    "roadmap_id": "rmp_7f5c8ed4897d4a61",
+    "part_id": "part_7",
+    "order": 6,
+    "title": "Why linear algebra matters in ML systems",
+    "start_time": 660.0,
+    "end_time": 670.0,
+    "transcript_chunk": "Linear algebra provides the essential framework that allows machine learning system to operate. It transforms raw data into structured numerical representations, enables efficient computation through matrix operations, and supports large scale optimization through modern libraries such as PyTorch and TensorFlow.",
+    "summary": "The closing emphasizes that linear algebra makes computation efficient, structure manageable, and ML systems scalable across modern libraries and models.",
+    "concepts": [
+      "efficient computation",
+      "large-scale optimization",
+      "PyTorch",
+      "TensorFlow",
+      "structured numerical representations"
+    ],
+    "equations": [],
+    "examples": [
+      "modern ML libraries",
+      "large-scale training"
+    ],
+    "suggested_visuals": [
+      "Pipeline from raw data to optimized model",
+      "PyTorch and TensorFlow logos"
+    ]
+  }
+]

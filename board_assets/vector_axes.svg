@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 180">
+  <rect width="220" height="180" fill="none"/>
+  <g stroke="#7dd3fc" stroke-width="3" fill="none" stroke-linecap="round">
+    <path d="M36 136H194"/>
+    <path d="M76 148V28"/>
+    <path d="M184 130l10 6-10 6"/>
+    <path d="M70 38l6-10 6 10"/>
+  </g>
+  <g stroke="#e86c2f" stroke-width="4" fill="none" stroke-linecap="round">
+    <path d="M76 136 152 76"/>
+    <path d="M144 76l8 0-2 8"/>
+  </g>
+  <g fill="#e8e8e0" font-family="IBM Plex Mono, monospace" font-size="16">
+    <text x="198" y="142">x</text>
+    <text x="82" y="24">y</text>
+    <text x="130" y="70">v</text>
+  </g>
+</svg>
