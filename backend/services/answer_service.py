@@ -32,7 +32,7 @@ import math
 import re
 from typing import Any, Optional
 
-from config import MANIM_VISUAL_STYLE, MAX_MANIM_VISUAL_DURATION_SECONDS
+from config import MANIM_VISUAL_STYLE, MAX_MANIM_VISUAL_DURATION_SECONDS, MIN_ABSOLUTE_MANIM_DURATION_SECONDS
 from backend.services.model_router import get_model_config, llm_json
 from manim_renderer import (
     direct_manim_validation_error,
@@ -165,6 +165,38 @@ _MANIM_CREATIVE_SAFE_RULES = """Creative Safe Mode:
 - Draw creative metaphors with built-in Manim primitives only. Do not use ImageMobject, SVGMobject, or external asset files.
 - The final result should feel like a visual explainer video, not a static text board."""
 
+_MANIM_CLARITY_OVER_LENGTH_RULES = """Clarity-over-length policy:
+- Quality and understandability are more important than matching the full audio duration. Create a concise, clear, visually rich explanation that captures the core concept. Do not make the animation longer by adding filler, repeated slides, or unnecessary waits.
+- Target a concise visual explanation, usually 30-60 seconds for a normal spoken explanation. It does not need to match the audio word-for-word.
+- A shorter visual is acceptable when it teaches the core idea clearly.
+- Prefer fewer, cleaner objects over many overlapping objects.
+- Use transformations, arrows, highlights, grouping, and fades to show relationships and cause/effect.
+- Start with a simple intuition, show one idea at a time, and end with a clear final takeaway.
+- Replace old objects before introducing new objects in the same area.
+- Use short concept labels, not long paragraphs.
+- Do not use visible "Step 1" or "Step 2" labels; use meaningful concept labels.
+- Avoid long filler waits, text-heavy screens, repeated panel/card animations, clutter, and extending duration without adding understanding.
+- The student should understand the core idea better after watching the visual, even if the visual is shorter than the audio."""
+
+_MANIM_PERSONA_VISUAL_RULES = """Teacher-persona visual style:
+- The visual should feel like this teacher is explaining the concept, not like a generic textbook slideshow.
+- Use metaphors, examples, pacing, and tone consistent with the teacher persona context.
+- If the teacher explains intuitively, use intuition-first visuals.
+- If the teacher is exam-focused, show clean exam-relevant diagrams and concise relationships.
+- If the teacher uses real-world analogies or practical examples, visualize those analogies when they help understanding.
+- Do not generate generic textbook visuals when persona context suggests a better style."""
+
+_MANIM_VISUAL_QUALITY_RUBRIC = """Internal visual quality rubric before returning Manim code:
+- Does the visual explain the main concept clearly?
+- Is it aligned with the teacher persona?
+- Are objects readable and uncropped?
+- Are there fewer than 5 major objects visible at once?
+- Does each animation have a teaching purpose?
+- Are old objects faded/transformed before new objects use the same space?
+- Are labels meaningful instead of generic Step labels?
+- Is the visual concise instead of artificially long?
+- Would a student understand the core idea from the animation?"""
+
 _MANIM_STRICT_LAYOUT_RULES = """Strict layout mode:
 - Use a 16:9 safe frame with SAFE_MARGIN = 0.35.
 - Keep all important objects inside the safe margin; never place text or diagrams on extreme edges.
@@ -199,24 +231,27 @@ def _manim_visual_style() -> str:
 def _manim_generation_style_prompt() -> str:
     style = _manim_visual_style()
     if style == "strict_layout":
-        return "\n\n".join([_MANIM_STRICT_LAYOUT_RULES, _MANIM_REGION_HELPERS_PROMPT])
+        return "\n\n".join([_MANIM_STRICT_LAYOUT_RULES, _MANIM_CLARITY_OVER_LENGTH_RULES, _MANIM_PERSONA_VISUAL_RULES, _MANIM_VISUAL_QUALITY_RUBRIC, _MANIM_REGION_HELPERS_PROMPT])
     if style == "fallback_only":
         return "\n\n".join(
             [
                 "MANIM_VISUAL_STYLE=fallback_only is active. Prefer simple reliable visuals; the renderer may use local fallback scenes.",
                 _MANIM_STRICT_LAYOUT_RULES,
+                _MANIM_CLARITY_OVER_LENGTH_RULES,
+                _MANIM_PERSONA_VISUAL_RULES,
+                _MANIM_VISUAL_QUALITY_RUBRIC,
                 _MANIM_REGION_HELPERS_PROMPT,
             ]
         )
-    return _MANIM_CREATIVE_SAFE_RULES
+    return "\n\n".join([_MANIM_CREATIVE_SAFE_RULES, _MANIM_CLARITY_OVER_LENGTH_RULES, _MANIM_PERSONA_VISUAL_RULES, _MANIM_VISUAL_QUALITY_RUBRIC])
 
 
 def _manim_repair_style_prompt() -> str:
     style = _manim_visual_style()
     if style == "strict_layout":
-        return "\n\n".join([_MANIM_STRICT_LAYOUT_RULES, _MANIM_REGION_HELPERS_PROMPT])
+        return "\n\n".join([_MANIM_STRICT_LAYOUT_RULES, _MANIM_CLARITY_OVER_LENGTH_RULES, _MANIM_PERSONA_VISUAL_RULES, _MANIM_VISUAL_QUALITY_RUBRIC, _MANIM_REGION_HELPERS_PROMPT])
     if style == "fallback_only":
-        return "\n\n".join([_MANIM_STRICT_LAYOUT_RULES, _MANIM_REGION_HELPERS_PROMPT])
+        return "\n\n".join([_MANIM_STRICT_LAYOUT_RULES, _MANIM_CLARITY_OVER_LENGTH_RULES, _MANIM_VISUAL_QUALITY_RUBRIC, _MANIM_REGION_HELPERS_PROMPT])
     return """Creative Safe repair rules:
 - Repair the exact validation or render failure while preserving the original visual metaphor and animation sequence.
 - Do not replace the scene with generic cards unless the original idea cannot be made executable.
@@ -224,7 +259,9 @@ def _manim_repair_style_prompt() -> str:
 - Replace fragile hardcoded indexes such as hierarchy[7] with named variables or loops.
 - Reduce offscreen shifts, add buff to edge placement when needed, and scale large text or diagrams down.
 - If an object appears where another object already exists, FadeOut or Transform the old group first.
-- If duration is too short, extend the same creative sequence across all spoken segments; do not add visible Step 1 / Step 2 labels."""
+- Improve readability, persona alignment, and conceptual clarity before changing duration.
+- Do not increase duration unless the visual is extremely short or misses the core explanation entirely.
+- Do not add filler waits or visible Step 1 / Step 2 labels."""
 
 
 def _clean_spaces(text: Any) -> str:
@@ -268,8 +305,13 @@ def estimate_spoken_duration_seconds(text: Any) -> float:
 
 def _target_visual_duration_seconds(estimated_spoken_duration: float) -> float:
     if estimated_spoken_duration <= 0:
-        return 12.0
-    return round(max(8.0, min(float(MAX_MANIM_VISUAL_DURATION_SECONDS), estimated_spoken_duration)), 2)
+        return min(float(MAX_MANIM_VISUAL_DURATION_SECONDS), max(12.0, float(MIN_ABSOLUTE_MANIM_DURATION_SECONDS)))
+    max_duration = float(MAX_MANIM_VISUAL_DURATION_SECONDS)
+    if estimated_spoken_duration <= 30.0:
+        return round(max(12.0, min(max_duration, estimated_spoken_duration)), 2)
+    if estimated_spoken_duration <= 45.0:
+        return round(max(float(MIN_ABSOLUTE_MANIM_DURATION_SECONDS), min(max_duration, estimated_spoken_duration * 0.8)), 2)
+    return round(min(max_duration, max(30.0, min(60.0, estimated_spoken_duration * 0.55))), 2)
 
 
 def _split_spoken_text_for_segments(text: Any, max_segments: int = 12) -> list[str]:
@@ -588,20 +630,25 @@ The output must be valid JSON only and must use this shape:
   "follow_up_question": "string"
 }
 
-Duration and coverage rules:
+Visual duration and coverage rules:
 - Keep spoken_answer around 45-70 seconds when possible. End with a brief follow-up question outside the answer field.
-- The Manim animation must cover the entire spoken_answer, not just the introduction.
-- If spoken_answer explains 6 steps, the Manim scene must show 6 visual steps.
-- Do not stop after the first 20 seconds.
-- Use waits and step-by-step transitions so the final MP4 duration is close to the spoken answer duration.
-- Estimate spoken duration at about 140 words per minute.
-- Target visual duration is the estimated spoken duration, capped at 90 seconds.
-- Minimum acceptable visual duration is 75% of the estimated spoken duration.
-- Every spoken segment must have a matching visual step.
-- visual_steps count must be >= spoken_segments count.
-- Sum of visual_steps durations should be close to total spoken duration.
-- Manim code must implement every visual_step in order.
-- Each spoken segment must correspond to a Manim animation or visual state.
+- Quality and understandability are more important than matching the full audio duration.
+- Target a concise Manim visual explanation, usually 30-60 seconds for a normal explanation.
+- The Manim visual can be shorter than the spoken answer if it clearly explains the core concept.
+- Do not force long Manim videos just to match audio duration.
+- Do not add filler waits, repeated slides, or unnecessary animations to increase duration.
+- It does not need to match every spoken word; it must make the main concept understandable.
+- visual_steps should represent the essential ideas, not a one-to-one transcript.
+- Estimate spoken duration at about 140 words per minute, but set estimated_total_visual_duration_seconds to the concise visual target.
+- Manim code should implement the core visual_steps in a polished sequence.
+- Only treat duration as a real problem when the visual is extremely short, under about 15-20 seconds for a normal explanation, or when it misses the core explanation.
+
+Teacher-persona visual rules:
+- Preserve the teacher's visual style, tone, examples, and metaphors.
+- If the teacher is practical, use practical examples or real-world analogies.
+- If the teacher is intuitive, start from a simple intuition and build visually.
+- If the teacher is exam-focused, show clean exam-relevant diagrams and concise relationships.
+- The visual should feel like this teacher is explaining the concept, not a generic slideshow.
 
 The visual must be interactive and explanatory, not a static board.
 Use step-by-step animations:
@@ -619,6 +666,17 @@ Creative quality rules:
 - Do not show generic visible labels like "Step 1", "Step 2", "Segment 1", or "Visual Step 1".
 - Use short meaningful labels tied to the concept instead.
 - Fade out or transform old objects before placing new objects in the same area.
+
+Visual quality rubric:
+- Does the visual explain the main concept clearly?
+- Is it aligned with the teacher persona?
+- Are objects readable and uncropped?
+- Are there fewer than 5 major objects visible at once?
+- Does each animation have a teaching purpose?
+- Are old objects faded/transformed before new objects use the same space?
+- Are labels meaningful instead of generic Step labels?
+- Is the visual concise instead of artificially long?
+- Would a student understand the core idea from the animation?
 
 Do not create a boring text board.
 Do not create mostly static rectangles and text.
@@ -692,7 +750,9 @@ Rules:
 - repair the smallest executable problem before simplifying the whole scene
 - keep the scene reliable without turning it into generic Step 1 / Step 2 cards
 - do not show generic visible labels like "Step 1", "Segment 1", or "Visual Step 1"
-- if repairing visual_too_short_for_spoken_answer, extend timing/waits and implement every visual step instead of returning an intro-only scene
+- prioritize crashes, invalid code, missing assets, unsafe indexing, overlap/cropping, readability, persona alignment, and conceptual clarity
+- do not increase duration unless the visual is extremely short or misses the core explanation entirely
+- do not add filler waits, repeated slides, or extra panels just to make the video longer
 - keep total visual duration at or below 90 seconds
 """
 
@@ -907,6 +967,43 @@ Return JSON:
 """.strip()
 
 
+def _teacher_visual_persona_context(
+    *,
+    persona_prompt: str,
+    teacher_name: str,
+    teacher_profession: str,
+    topic: str,
+    part_context: str = "",
+) -> str:
+    source = f"{persona_prompt}\n{part_context}".lower()
+    traits: list[str] = []
+    if re.search(r"\b(exam|jee|neet|test|question|shortcut|formula|marks|revision)\b", source):
+        traits.append("exam-focused")
+    if re.search(r"\b(practical|real[- ]world|example|industry|use case|hands[- ]on)\b", source):
+        traits.append("practical")
+    if re.search(r"\b(intuition|intuitive|why|feel|mental model|first principles)\b", source):
+        traits.append("intuitive")
+    if re.search(r"\b(story|analogy|metaphor|imagine|like a)\b", source):
+        traits.append("story/analogy-based")
+    if re.search(r"\b(visual|diagram|draw|picture|graph|flow)\b", source):
+        traits.append("visual")
+    examples = []
+    for label in ("EXAMPLES", "SUGGESTED_VISUALS"):
+        match = re.search(rf"{label}:\s*(.+)", part_context or "", flags=re.I)
+        if match:
+            examples.extend([_trim_sentence(item.strip(), 72) for item in match.group(1).split(",") if item.strip()])
+    traits_text = ", ".join(dict.fromkeys(traits)) or "teacher-specific style from the persona prompt"
+    examples_text = "; ".join(dict.fromkeys(examples[:4])) or "use examples and metaphors from the persona prompt when helpful"
+    return "\n".join(
+        [
+            f"Teacher subject: {teacher_profession or 'subject expert'} teaching {topic or 'the current concept'}",
+            f"Teacher style signals: {traits_text}",
+            f"Teacher tone/style source: {_trim_sentence(persona_prompt or 'No explicit persona prompt provided; infer a clear teacher style from the context.', 700)}",
+            f"Examples/metaphors from teacher videos: {examples_text}",
+        ]
+    )
+
+
 def _build_combined_teaching_user_prompt(
     *,
     mode: str,
@@ -922,6 +1019,13 @@ def _build_combined_teaching_user_prompt(
 ) -> str:
     memory = session_memory if isinstance(session_memory, dict) else {}
     memory_json = json.dumps(memory, ensure_ascii=False, indent=2) if memory else "{}"
+    persona_visual_context = _teacher_visual_persona_context(
+        persona_prompt=persona_prompt,
+        teacher_name=teacher_name,
+        teacher_profession=teacher_profession,
+        topic=topic,
+        part_context=part_context,
+    )
     return f"""
 Mode:
 {mode}
@@ -931,6 +1035,9 @@ Teacher persona prompt:
 
 Teacher:
 {teacher_name or "Teacher"}, {teacher_profession or "subject expert"}
+
+Teacher visual persona context:
+{persona_visual_context}
 
 Student:
 {student_name or "Student"}
@@ -962,14 +1069,17 @@ Rules:
 - Speech should sound like the teacher is speaking naturally.
 - Use SESSION_MEMORY_JSON to continue the current step and next teaching goal.
 - Use the previous answer and current reply block above as the continuity anchor.
-- visual_plan_with_timestamps must align with the spoken answer.
-- spoken_segments and visual_steps must cover the full answer from beginning to end.
-- Estimate the spoken answer duration at 140 words per minute, then set estimated_total_visual_duration_seconds.
-- The Manim code must implement every visual_step in order and target the estimated spoken duration, capped at 90 seconds.
-- Do not make a 20 second animation for a 60-80 second spoken answer.
+- visual_plan_with_timestamps must support the spoken answer, but it does not need to match every spoken word.
+- visual_steps should capture the core concepts and main relationships.
+- Estimate the spoken answer duration at 140 words per minute, then set estimated_total_visual_duration_seconds to a concise visual target, usually 30-60 seconds.
+- A 35-45 second Manim visual is acceptable for a 70-80 second spoken answer if it clearly teaches the core concept.
+- Do not make the animation longer by adding filler waits, repeated slides, or unnecessary panels.
 - Visual should be Manim-based.
 - Avoid static board-like visuals.
 - Prefer animation: moving arrows, highlighting, progressive reveal, transformations, step-by-step diagrams.
+- Make the animation feel like a polished visual explainer from the teacher persona.
+- Use persona-consistent metaphors and examples when they improve understanding.
+- Use meaningful concept labels, not visible "Step 1" or "Step 2" labels.
 - If formulas are needed, use simple text unless LaTeX is available.
 - Keep visual latency reasonable.
 - Keep Manim code simple enough to render quickly.
@@ -986,9 +1096,11 @@ def _fallback_combined_manim_code(
     speech_segments: list[dict[str, Any]],
     visual_segments: list[dict[str, Any]],
     target_duration_seconds: float | None = None,
+    persona_style_hint: str = "",
 ) -> str:
     title_literal = json.dumps(_trim_sentence(title or topic or "Visual explanation", 46))
     topic_literal = json.dumps(_trim_sentence(topic or "core idea", 54))
+    persona_hint_literal = json.dumps(_trim_sentence(persona_style_hint or "Teacher-style visual intuition", 54))
     steps = []
     count = max(len(speech_segments), len(visual_segments), 1)
     total_target = target_duration_seconds or sum(_safe_float(item.get("estimated_duration_seconds"), 0.0) for item in speech_segments) or 12.0
@@ -1023,6 +1135,7 @@ class {MANIM_SCENE_CLASS_NAME}(Scene):
 
         steps = {steps_literal}
         topic_label = {topic_literal}
+        persona_hint = {persona_hint_literal}
         for index, step in enumerate(steps):
             label = step.get("label") or "Key idea"
             speech = step.get("speech") or label
@@ -1031,9 +1144,11 @@ class {MANIM_SCENE_CLASS_NAME}(Scene):
             place_bottom(focus)
             replace_region(self, active_regions, "bottom", focus)
 
-            left_items = [label, speech]
+            left_items = [topic_label, label]
             if index == 0:
-                left_items.append(topic_label)
+                left_items.append(persona_hint)
+            else:
+                left_items.append(speech)
             left_panel = bullet_list(left_items[:3], max_width=5.25, font_size=24)
             place_left(left_panel)
             replace_region(self, active_regions, "left", left_panel)
@@ -1052,7 +1167,7 @@ class {MANIM_SCENE_CLASS_NAME}(Scene):
             replace_region(self, active_regions, "right", diagram)
             self.wait(max(0.4, duration - 2.0))
 
-        takeaway = safe_text("Pause here: connect each step back to the main idea.", font_size=24, max_width=11.5)
+        takeaway = safe_text("Takeaway: connect the cause, change, and result.", font_size=24, max_width=11.5)
         place_bottom(takeaway)
         replace_region(self, active_regions, "bottom", takeaway)
         self.wait(0.8)
@@ -1134,6 +1249,7 @@ def _fallback_combined_response(
                 speech_segments=speech_segments,
                 visual_segments=visual_segments,
                 target_duration_seconds=target_visual,
+                persona_style_hint=f"{teacher_name or 'Teacher'} style: practical, clear visual intuition",
             ),
             "estimatedTotalVisualDurationSeconds": target_visual,
         },
@@ -1287,6 +1403,7 @@ def _normalize_combined_teaching_response(
         speech_segments=speech["segments"],
         visual_segments=(fallback.get("visual") or {}).get("segments") or [],
         target_duration_seconds=_target_visual_duration_seconds(speech.get("estimated_duration_seconds") or estimate_spoken_duration_seconds(speech["text"])),
+        persona_style_hint=f"{teacher_name or 'Teacher'} style visual intuition",
     )
     visual = _normalize_combined_visual(parsed.get("visual"), speech_segments=speech["segments"], fallback_code=fallback_code)
     control = parsed.get("teachingControl") if isinstance(parsed.get("teachingControl"), dict) else {}
@@ -1418,6 +1535,13 @@ async def generate_teaching_response_with_visuals(
         teacher_name=teacher_name,
     )
     debug = normalized.get("debug") if isinstance(normalized.get("debug"), dict) else {}
+    persona_visual_context = _teacher_visual_persona_context(
+        persona_prompt=persona_prompt,
+        teacher_name=teacher_name,
+        teacher_profession=teacher_profession,
+        topic=topic,
+        part_context=full_part_context,
+    )
     debug.update(
         {
             "model_provider": cfg.provider,
@@ -1428,6 +1552,9 @@ async def generate_teaching_response_with_visuals(
             "llm_response_received": bool(raw),
             "manim_code_source": (normalized.get("visual") or {}).get("manimCodeSource") or "unknown",
             "manim_visual_style": _manim_visual_style(),
+            "visual_quality_mode": "clarity_over_length",
+            "persona_style_used": bool(persona_prompt or teacher_name or teacher_profession),
+            "persona_visual_context": persona_visual_context,
             "previous_assistant_answer_included": bool(previous_assistant_answer),
             "recent_turns_included": len(recent_turns),
         }
@@ -1458,6 +1585,7 @@ def build_fallback_manim_code(
     spoken_answer: str,
     visual_plan: list[dict[str, Any]] | None = None,
     target_duration_seconds: float | None = None,
+    persona_style_hint: str = "",
 ) -> str:
     speech = _normalize_combined_speech({"text": spoken_answer or title or topic}, fallback_text=spoken_answer or title or topic or "Visual explanation")
     visual_segments = []
@@ -1478,6 +1606,7 @@ def build_fallback_manim_code(
         speech_segments=speech.get("segments") or [],
         visual_segments=visual_segments,
         target_duration_seconds=target_duration_seconds or _target_visual_duration_seconds(estimate_spoken_duration_seconds(spoken_answer)),
+        persona_style_hint=persona_style_hint,
     )
 
 
@@ -1534,8 +1663,9 @@ Repair the Manim code so it renders safely and still follows the same spoken ans
 Active Manim visual style:
 {style}
 
-If the error is visual_too_short_for_spoken_answer, rewrite or extend the scene so it covers every spoken segment and targets 75-100% of the estimated spoken duration, capped at 90 seconds.
-If the previous video was only about 20 seconds for a much longer explanation, do not merely patch syntax; rewrite the timing and waits to cover all spoken segments.
+Prioritize real quality and reliability problems: render failure, invalid code, missing assets, unsafe indexing, severe overlap/cropping, unreadable text, repetitive/generic visuals, weak persona alignment, or a visual that misses the core concept.
+Do not focus on increasing duration unless the previous video was extremely short, under about 15-20 seconds for a normal explanation, or missed the core explanation entirely.
+If the rendered video is simply shorter than the spoken answer but clear and understandable, preserve that concise structure.
 Simplify the scene if the error came from animation complexity, mobject state, transform matching, or unsupported Manim behavior.
 Preserve the educational idea, creative metaphor, object motion, and animation sequence.
 Do not replace the scene with generic Step 1 / Step 2 cards.
@@ -1544,6 +1674,7 @@ If strict_layout mode is active, rewrite using the region-based layout helpers. 
 Before showing new content in an occupied area, FadeOut or Transform the old group first.
 Avoid complex transforms if they caused failure; prefer simple FadeOut/FadeIn region replacement.
 Use only built-in Manim primitives and avoid external assets.
+Do not add filler waits, repeated slides, or unnecessary panels just to make the video longer.
 """.strip()
     try:
         result = await llm_json(
@@ -1743,9 +1874,19 @@ async def _ensure_visual_manim_code(
         return payload
     speech_text = ((payload.get("speech") or {}).get("text") or "").strip()
     cues = visual.get("timestamps") or (payload.get("syncPlan") or {}).get("segments") or []
+    persona_visual_context = _teacher_visual_persona_context(
+        persona_prompt=persona_prompt,
+        teacher_name=teacher_name,
+        teacher_profession="",
+        topic=topic,
+        part_context=build_roadmap_part_context(roadmap, part),
+    )
     user = f"""
 Teacher persona prompt:
 {persona_prompt or "(no persona prompt yet)"}
+
+Teacher visual persona context:
+{persona_visual_context}
 
 Student name:
 {student_name or "Student"}
@@ -1773,6 +1914,9 @@ Speech explanation:
 
 Visual cues/timestamps:
 {json.dumps(cues, ensure_ascii=False)}
+
+Manim goal:
+Create a concise, persona-aligned visual explanation. It can be shorter than the speech if it teaches the core idea clearly. Use intuition, motion, arrows/highlights/transforms, readable concept labels, and a final takeaway. Do not add filler just to match audio duration.
 """.strip()
     text_only = manim_text_only_mode()
     try:

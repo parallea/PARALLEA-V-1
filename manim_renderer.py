@@ -622,7 +622,7 @@ def _to_edge_layout_error(text: str, *, strict: bool) -> str | None:
 
 
 def _font_size_layout_error(text: str, *, strict: bool) -> str | None:
-    limit = 52 if strict else 80
+    limit = 52 if strict else 72
     for match in re.finditer(r"font_size\s*=\s*([0-9]+)", text):
         if int(match.group(1)) > limit:
             return f"layout risk: font_size {match.group(1)} is too large for safe 16:9 layout"
@@ -655,11 +655,25 @@ def _unsafe_group_index_error(tree: ast.AST) -> str | None:
         if not isinstance(node, ast.Subscript):
             continue
         index = _subscript_index_int(node.slice)
-        if index is None or index < 6:
+        if index is None or index < 4:
             continue
         base_name = _subscript_base_name(node.value).lower()
         if base_name in risky_base_names:
             return f"unsafe hardcoded group indexing: {base_name}[{index}] can fail when generated hierarchy size changes"
+    return None
+
+
+def _text_density_quality_error(text: str, *, strict: bool) -> str | None:
+    text_call_count = len(re.findall(r"\b(?:Text|MarkupText|MathTex|Tex|safe_text)\s*\(", text))
+    replacement_signal = any(token in text for token in ("FadeOut(", "Transform(", "ReplacementTransform(", "replace_region("))
+    if text_call_count > (12 if strict else 18) and not replacement_signal:
+        return "quality risk: too many text objects without fading or transforming old content"
+    shape_count = len(re.findall(r"\b(?:Circle|Rectangle|RoundedRectangle|Ellipse|Arrow|Line|Dot|Axes|NumberPlane|VGroup)\s*\(", text))
+    motion_signal = any(token in text for token in ("Arrow(", "Indicate(", "Circumscribe(", ".animate", "Transform(", "Create("))
+    if text_call_count >= 5 and shape_count <= 1 and not motion_signal:
+        return "quality risk: text-heavy static board; add a meaningful diagram, metaphor, or relationship motion"
+    if len(re.findall(r"\.move_to\s*\(\s*ORIGIN\s*\)", text)) >= 4 and not replacement_signal:
+        return "quality risk: repeated objects placed at ORIGIN can overlap severely"
     return None
 
 
@@ -669,13 +683,14 @@ def _creative_safe_layout_error(text: str, tree: ast.AST) -> str | None:
         or _shift_layout_error(text, strict=False)
         or _to_edge_layout_error(text, strict=False)
         or _font_size_layout_error(text, strict=False)
+        or _text_density_quality_error(text, strict=False)
     )
 
 
 def _risky_layout_error(text: str) -> str | None:
     if not re.search(r"active_regions\s*=\s*\{", text) or "replace_region(self" not in text:
         return "layout risk: generated scene must use active_regions and replace_region for region-safe replacement"
-    layout_error = _shift_layout_error(text, strict=True) or _to_edge_layout_error(text, strict=True) or _font_size_layout_error(text, strict=True)
+    layout_error = _shift_layout_error(text, strict=True) or _to_edge_layout_error(text, strict=True) or _font_size_layout_error(text, strict=True) or _text_density_quality_error(text, strict=True)
     if layout_error:
         return layout_error
     text_call_count = len(re.findall(r"\b(?:Text|MarkupText|MathTex|Tex)\s*\(", text))
@@ -792,14 +807,24 @@ def fallback_direct_manim_code(
     payload = payload or {}
     scene_class_name = normalize_direct_scene_class_name(scene_class_name or payload.get("scene_class_name"))
     title = json.dumps(trim_sentence(payload.get("title") or "Clarification", 44))
-    subtitle_text = payload.get("subtitle") or reason or "Break the idea into small connected steps."
-    bullets = split_sentences(subtitle_text, limit=4) or [
-        "Break the idea into small steps.",
-        "Watch how each step connects.",
-        "Use the result to answer the doubt.",
+    raw_steps: list[str] = []
+    for source in (payload.get("visual_steps"), (payload.get("av_sync") or {}).get("visual_steps") if isinstance(payload.get("av_sync"), dict) else None):
+        if isinstance(source, list):
+            for item in source:
+                if isinstance(item, dict):
+                    label = clean_spaces(item.get("description") or item.get("cue") or item.get("label") or item.get("title"))
+                    if label and not GENERIC_VISIBLE_STEP_LABEL_RE.search(label):
+                        raw_steps.append(label)
+    subtitle_text = payload.get("visual_prompt") or payload.get("subtitle") or payload.get("student_query") or ""
+    bullets = raw_steps[:4] or split_sentences(subtitle_text, limit=4) or [
+        "Start with the simplest intuition.",
+        "Show how the pieces affect each other.",
+        "Connect the change to the result.",
+        "End with the key takeaway.",
     ]
     bullets = [json.dumps(trim_sentence(item, 76)) for item in bullets[:4]]
     bullets_literal = "[" + ", ".join(bullets) + "]"
+    duration = round(clamp(safe_float(payload.get("duration_sec"), 24.0), 18.0, 45.0), 1)
     return f'''from manim import *
 
 {REGION_SAFE_HELPERS_CODE}
@@ -831,7 +856,7 @@ class {scene_class_name}(Scene):
         follow = safe_text("Does that make sense now?", font_size=24, max_width=11.5)
         place_bottom(follow)
         replace_region(self, active_regions, "bottom", follow)
-        self.wait(2)
+        self.wait(max(1.0, {duration} - 4.4))
 '''
 
 
@@ -2417,6 +2442,15 @@ def run_manim_scene(
                 "region_replacement_used": bool((payload or {}).get("region_replacement_used")),
                 "visual_complexity": (payload or {}).get("visual_complexity"),
                 "repair_used": bool((payload or {}).get("repair_used")),
+                "quality_repair_reason": (payload or {}).get("quality_repair_reason"),
+                "fallback_used": used_fallback,
+                "duration_accepted": (payload or {}).get("duration_accepted"),
+                "duration_warning_only": (payload or {}).get("duration_warning_only"),
+                "duration_ratio": (payload or {}).get("duration_ratio"),
+                "overlap_risk_detected": bool((payload or {}).get("overlap_risk_detected")),
+                "crop_risk_detected": bool((payload or {}).get("crop_risk_detected")),
+                "persona_style_used": bool((payload or {}).get("persona_style_used")),
+                "visual_quality_mode": (payload or {}).get("visual_quality_mode"),
                 "visible_step_labels_detected": bool((payload or {}).get("visible_step_labels_detected")),
             },
             indent=2,
@@ -2455,6 +2489,16 @@ def run_manim_scene(
         "region_replacement_used": bool((payload or {}).get("region_replacement_used")),
         "visual_complexity": (payload or {}).get("visual_complexity"),
         "repair_used": bool((payload or {}).get("repair_used")),
+        "quality_repair_reason": (payload or {}).get("quality_repair_reason"),
+        "fallback_used": used_fallback,
+        "duration_accepted": (payload or {}).get("duration_accepted"),
+        "duration_warning_only": (payload or {}).get("duration_warning_only"),
+        "duration_ratio": (payload or {}).get("duration_ratio"),
+        "overlap_risk_detected": bool((payload or {}).get("overlap_risk_detected")),
+        "crop_risk_detected": bool((payload or {}).get("crop_risk_detected")),
+        "persona_style_used": bool((payload or {}).get("persona_style_used")),
+        "visible_step_labels_detected": bool((payload or {}).get("visible_step_labels_detected")),
+        "visual_quality_mode": (payload or {}).get("visual_quality_mode"),
     }
 
 
@@ -2512,6 +2556,16 @@ def render_manim_payload(
             "region_replacement_used": bool(payload.get("region_replacement_used")),
             "visual_complexity": payload.get("visual_complexity"),
             "repair_used": bool(payload.get("repair_used")),
+            "quality_repair_reason": payload.get("quality_repair_reason"),
+            "fallback_used": (validation or {}).get("fallback_used", False),
+            "duration_accepted": payload.get("duration_accepted"),
+            "duration_warning_only": payload.get("duration_warning_only"),
+            "duration_ratio": payload.get("duration_ratio"),
+            "overlap_risk_detected": bool(payload.get("overlap_risk_detected")),
+            "crop_risk_detected": bool(payload.get("crop_risk_detected")),
+            "persona_style_used": bool(payload.get("persona_style_used")),
+            "visible_step_labels_detected": bool(payload.get("visible_step_labels_detected")),
+            "visual_quality_mode": payload.get("visual_quality_mode"),
         }
 
     return run_manim_scene(

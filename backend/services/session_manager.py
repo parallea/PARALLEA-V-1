@@ -60,7 +60,14 @@ from backend.store.models import (
     utcnow,
 )
 from manim_renderer import direct_manim_validation_error, visible_step_labels_detected
-from config import MANIM_VISUAL_STYLE, MAX_MANIM_VISUAL_DURATION_SECONDS, MIN_VISUAL_TO_AUDIO_DURATION_RATIO, ROADMAP_PART_MATCH_THRESHOLD
+from config import (
+    AV_SYNC_DURATION_REPAIR_ENABLED,
+    MANIM_VISUAL_STYLE,
+    MAX_MANIM_VISUAL_DURATION_SECONDS,
+    MIN_ABSOLUTE_MANIM_DURATION_SECONDS,
+    MIN_VISUAL_TO_AUDIO_DURATION_RATIO,
+    ROADMAP_PART_MATCH_THRESHOLD,
+)
 
 logger = logging.getLogger("parallea.session")
 
@@ -122,11 +129,21 @@ _STATE_ALIASES = {
     "answering_question": "clarifying_part_doubt",
     "teaching_persona_only": "persona_only_teaching",
 }
+_DURATION_WARNING_RATIO = 0.75
+_VISUAL_QUALITY_MODE = "clarity_over_length"
+_GENERIC_VISUAL_STEP_RE = re.compile(
+    r"^\s*(?:step|segment|visual step|reveal|show|explain|highlight|draw|move|transform|animate|key idea)\b(?:\s*\d+)?\s*[:.-]?\s*$",
+    re.I,
+)
 
 
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
+
+
+def _clean_text(value: Any) -> str:
+    return " ".join(str(value or "").split())
 
 
 def _greeting_text(student_name: str, persona: dict[str, Any]) -> str:
@@ -1327,6 +1344,18 @@ def _visual_step_duration_seconds(visual_plan: Any) -> float:
     return round(total, 2)
 
 
+def _target_clarity_visual_duration_seconds(estimated_spoken: float, visual_steps_duration: float = 0.0) -> float:
+    source = max(float(estimated_spoken or 0.0), float(visual_steps_duration or 0.0))
+    max_duration = float(MAX_MANIM_VISUAL_DURATION_SECONDS)
+    if source <= 0:
+        return min(max_duration, 20.0)
+    if source <= 30.0:
+        return round(max(12.0, min(max_duration, source)), 2)
+    if source <= 45.0:
+        return round(max(20.0, min(max_duration, source * 0.8)), 2)
+    return round(min(max_duration, max(30.0, min(60.0, source * 0.55))), 2)
+
+
 def _av_sync_context(payload: dict[str, Any], visual_payload: dict[str, Any], speech_text: str, visual_plan: Any) -> dict[str, Any]:
     speech = payload.get("speech") if isinstance(payload.get("speech"), dict) else {}
     spoken_segments = payload.get("spoken_segments") if isinstance(payload.get("spoken_segments"), list) else speech.get("segments")
@@ -1349,8 +1378,7 @@ def _av_sync_context(payload: dict[str, Any], visual_payload: dict[str, Any], sp
         or estimated_spoken
         or 12.0
     )
-    target_source = max(estimated_spoken, visual_steps_duration)
-    target_visual = round(max(8.0, min(float(MAX_MANIM_VISUAL_DURATION_SECONDS), target_source or 12.0)), 2)
+    target_visual = _target_clarity_visual_duration_seconds(estimated_spoken, visual_steps_duration)
     return {
         "word_count": word_count,
         "estimated_spoken_duration_seconds": round(estimated_spoken, 2),
@@ -1362,19 +1390,112 @@ def _av_sync_context(payload: dict[str, Any], visual_payload: dict[str, Any], sp
     }
 
 
-def _visual_too_short(rendered: dict[str, Any], av_sync: dict[str, Any]) -> tuple[bool, float | None, float | None]:
+def _meaningful_visual_step_count(visual_steps: Any) -> int:
+    if not isinstance(visual_steps, list):
+        return 0
+    count = 0
+    for item in visual_steps:
+        if not isinstance(item, dict):
+            continue
+        description = _clean_text(
+            item.get("description")
+            or item.get("cue")
+            or item.get("visualCue")
+            or item.get("matches_spoken_text")
+            or item.get("label")
+            or item.get("title")
+        )
+        if description and not _GENERIC_VISUAL_STEP_RE.match(description):
+            count += 1
+    return count
+
+
+def _core_concepts_clearly_missing(av_sync: dict[str, Any]) -> bool:
+    """Conservative signal for a real quality gap, not a duration mismatch."""
+    estimated = float(av_sync.get("estimated_spoken_duration_seconds") or 0.0)
+    spoken_count = int(av_sync.get("spoken_segment_count") or 0)
+    visual_steps = av_sync.get("visual_steps") if isinstance(av_sync.get("visual_steps"), list) else []
+    meaningful_visuals = _meaningful_visual_step_count(visual_steps)
+    if estimated < 30.0 or spoken_count < 3:
+        return False
+    if not visual_steps:
+        return True
+    if spoken_count >= 6 and meaningful_visuals <= 1:
+        return True
+    return False
+
+
+def _duration_acceptance_policy(rendered: dict[str, Any], av_sync: dict[str, Any]) -> dict[str, Any]:
     estimated = float(av_sync.get("estimated_spoken_duration_seconds") or 0.0)
     duration = rendered.get("media_duration_seconds")
     try:
         actual = float(duration) if duration is not None else None
     except Exception:
         actual = None
-    if actual is None:
-        return False, actual, None
-    ratio = round(actual / estimated, 3) if estimated > 0 else None
-    if estimated >= 30.0 and actual < (MIN_VISUAL_TO_AUDIO_DURATION_RATIO * estimated):
-        return True, actual, ratio
-    return False, actual, ratio
+    ratio = round(actual / estimated, 3) if actual is not None and estimated > 0 else None
+    warning = bool(actual is not None and estimated >= 30.0 and actual < (_DURATION_WARNING_RATIO * estimated))
+    extremely_short = bool(actual is not None and estimated >= 30.0 and actual < float(MIN_ABSOLUTE_MANIM_DURATION_SECONDS))
+    core_concepts_missing = _core_concepts_clearly_missing(av_sync)
+    ratio_repair = bool(
+        AV_SYNC_DURATION_REPAIR_ENABLED
+        and actual is not None
+        and estimated > 45.0
+        and ratio is not None
+        and ratio < float(MIN_VISUAL_TO_AUDIO_DURATION_RATIO)
+    )
+    quality_repair_reason = None
+    if extremely_short:
+        quality_repair_reason = "visual_extremely_short"
+    elif core_concepts_missing:
+        quality_repair_reason = "visual_misses_most_core_concepts"
+    elif ratio_repair:
+        quality_repair_reason = "duration_ratio_below_repair_threshold"
+    repair_required = bool(quality_repair_reason)
+    duration_accepted = not repair_required
+    return {
+        "estimated_spoken_duration_seconds": round(estimated, 2),
+        "manim_duration_seconds": actual,
+        "duration_ratio": ratio,
+        "duration_warning": warning,
+        "duration_accepted": duration_accepted,
+        "duration_warning_only": bool(warning and duration_accepted),
+        "repair_required": repair_required,
+        "quality_repair_reason": quality_repair_reason,
+        "duration_repair_enabled": bool(AV_SYNC_DURATION_REPAIR_ENABLED),
+        "min_absolute_manim_duration_seconds": float(MIN_ABSOLUTE_MANIM_DURATION_SECONDS),
+        "min_visual_to_audio_duration_ratio": float(MIN_VISUAL_TO_AUDIO_DURATION_RATIO),
+        "visual_quality_mode": _VISUAL_QUALITY_MODE,
+        "core_concepts_missing": core_concepts_missing,
+        "reason": "clarity_over_length" if duration_accepted else quality_repair_reason,
+    }
+
+
+def _static_quality_flags(code: str, *, validation_error: str | None = None, visual_style: str = "") -> dict[str, bool]:
+    text = code or ""
+    validation_text = validation_error or ""
+    text_call_count = len(re.findall(r"\b(?:Text|MarkupText|MathTex|Tex|safe_text)\s*\(", text))
+    shape_count = len(re.findall(r"\b(?:Circle|Rectangle|RoundedRectangle|Ellipse|Arrow|Line|Dot|Axes|NumberPlane|VGroup)\s*\(", text))
+    replacement_used = _region_replacement_signal(text, visual_style)
+    crop_risk = bool(
+        re.search(r"\.shift\s*\(\s*(?:UP|DOWN)\s*\*\s*(?:[4-9]|\d{2,})(?:\.\d+)?", text)
+        or re.search(r"\.shift\s*\(\s*(?:LEFT|RIGHT)\s*\*\s*(?:[7-9]|\d{2,})(?:\.\d+)?", text)
+        or "crop" in validation_text.lower()
+        or "to_edge" in validation_text.lower()
+    )
+    overlap_risk = bool(
+        "overlap" in validation_text.lower()
+        or (text_call_count >= 9 and not replacement_used and "arrange(" not in text and "next_to(" not in text)
+        or len(re.findall(r"\.move_to\s*\(\s*ORIGIN\s*\)", text)) >= 4
+    )
+    return {
+        "overlap_risk_detected": overlap_risk,
+        "crop_risk_detected": crop_risk,
+        "visible_text_too_large_detected": bool(re.search(r"font_size\s*=\s*(?:[8-9]\d|\d{3,})", text) or "font_size" in validation_text.lower()),
+        "too_many_text_objects_detected": bool(text_call_count > 14 and not replacement_used),
+        "unsafe_indexing_detected": "unsafe hardcoded group indexing" in validation_text.lower(),
+        "external_asset_detected": bool(re.search(r"\b(?:ImageMobject|SVGMobject)\s*\(", text) or "external assets" in validation_text.lower()),
+        "text_heavy_static_board_detected": bool(text_call_count >= 5 and shape_count <= 1 and not replacement_used),
+    }
 
 
 async def _render_teaching_visual(
@@ -1409,9 +1530,16 @@ async def _render_teaching_visual(
     visual_style = str(MANIM_VISUAL_STYLE or "creative_safe").strip().lower() or "creative_safe"
     repair_attempted = False
     repair_used = False
+    quality_repair_reason: str | None = None
     validation_error = direct_manim_validation_error(code) if code else "empty Manim code"
     visual_prompt = (visual_payload.get("visualPrompt") or visual_payload.get("manimPlan") or "").strip()
     visible_step_labels = visible_step_labels_detected(code) if code else False
+    debug_payload = payload.get("debug") if isinstance(payload.get("debug"), dict) else {}
+    persona_style_used = bool(
+        debug_payload.get("persona_style_used")
+        or debug_payload.get("persona_visual_context")
+        or "teacher persona" in visual_prompt.lower()
+    )
     logger.info(
         "[teaching-visual] visualNeeded=true visualType=manim code_chars=%s code_source=%s manim_visual_style=%s validation_error=%s visible_step_labels_detected=%s visual_prompt_chars=%s session=%s title=%s",
         len(code),
@@ -1442,13 +1570,16 @@ async def _render_teaching_visual(
             spoken_answer=speech_text,
             visual_plan=visual_plan if isinstance(visual_plan, list) else [],
             target_duration_seconds=av_sync["target_visual_duration_seconds"],
+            persona_style_hint=str(debug_payload.get("persona_visual_context") or ""),
         )
         code_source = "local_fallback"
         validation_error = direct_manim_validation_error(code)
         visible_step_labels = visible_step_labels_detected(code)
+    quality_flags = _static_quality_flags(code, validation_error=validation_error, visual_style=visual_style)
     if validation_error:
         logger.warning("[manim] generated code validation failed before render; attempting one repair session=%s title=%s error=%s", session_id, title, validation_error)
         repair_attempted = True
+        quality_repair_reason = validation_error
         repaired = await repair_manim_code_with_error(
             failed_code=code,
             error_log=validation_error,
@@ -1467,6 +1598,8 @@ async def _render_teaching_visual(
             code_source = repaired.get("source") or "ai_repaired"
             repair_used = True
             validation_error = None
+            visible_step_labels = visible_step_labels_detected(code)
+            quality_flags = _static_quality_flags(code, validation_error=None, visual_style=visual_style)
             logger.info("[manim] validation repair succeeded session=%s title=%s model=%s", session_id, title, repaired.get("model"))
         else:
             logger.warning("[manim] validation repair failed; using local fallback session=%s title=%s error=%s", session_id, title, repaired_error)
@@ -1476,9 +1609,12 @@ async def _render_teaching_visual(
                 spoken_answer=speech_text,
                 visual_plan=visual_plan if isinstance(visual_plan, list) else [],
                 target_duration_seconds=av_sync["target_visual_duration_seconds"],
+                persona_style_hint=str(debug_payload.get("persona_visual_context") or ""),
             )
             code_source = "local_fallback"
             validation_error = direct_manim_validation_error(code)
+            visible_step_labels = visible_step_labels_detected(code)
+            quality_flags = _static_quality_flags(code, validation_error=validation_error, visual_style=visual_style)
 
     sync_plan = payload.get("syncPlan") or {}
     visual_complexity = _visual_complexity_label(visual_plan, code)
@@ -1504,9 +1640,13 @@ async def _render_teaching_visual(
         "visual_complexity": visual_complexity,
         "repair_used": repair_used,
         "repair_attempted": repair_attempted,
+        "quality_repair_reason": quality_repair_reason,
         "fallback_attempted": False,
         "render_failure_stage": "repaired" if repair_used else "generated",
         "visible_step_labels_detected": visible_step_labels,
+        "persona_style_used": persona_style_used,
+        "visual_quality_mode": _VISUAL_QUALITY_MODE,
+        **quality_flags,
         "visual_steps": av_sync.get("visual_steps") if isinstance(av_sync.get("visual_steps"), list) else [],
         "spoken_segments": av_sync.get("spoken_segments") if isinstance(av_sync.get("spoken_segments"), list) else [],
         "av_sync": {
@@ -1518,6 +1658,9 @@ async def _render_teaching_visual(
             "visual_steps": av_sync.get("visual_steps") if isinstance(av_sync.get("visual_steps"), list) else [],
             "spoken_segments": av_sync.get("spoken_segments") if isinstance(av_sync.get("spoken_segments"), list) else [],
             "min_visual_to_audio_duration_ratio": MIN_VISUAL_TO_AUDIO_DURATION_RATIO,
+            "min_absolute_manim_duration_seconds": MIN_ABSOLUTE_MANIM_DURATION_SECONDS,
+            "duration_repair_enabled": AV_SYNC_DURATION_REPAIR_ENABLED,
+            "visual_quality_mode": _VISUAL_QUALITY_MODE,
         },
     }
     try:
@@ -1532,6 +1675,7 @@ async def _render_teaching_visual(
             if code_source != "local_fallback":
                 logger.warning("[manim] first render failed; attempting one AI repair session=%s title=%s error=%s", session_id, title, str(first_exc)[:300])
                 repair_attempted = True
+                quality_repair_reason = "render_failure"
                 repaired = await repair_manim_code_with_error(
                     failed_code=code,
                     error_log=error_log,
@@ -1558,6 +1702,8 @@ async def _render_teaching_visual(
                         "render_failure_stage": "repaired",
                         "visual_complexity": _visual_complexity_label(visual_plan, repaired_code),
                         "visible_step_labels_detected": visible_step_labels_detected(repaired_code),
+                        "quality_repair_reason": quality_repair_reason,
+                        **_static_quality_flags(repaired_code, validation_error=None, visual_style=visual_style),
                     }
                     try:
                         rendered = await render_manim_payload_async(
@@ -1577,32 +1723,42 @@ async def _render_teaching_visual(
                 raise first_exc
         if not rendered:
             raise RuntimeError("Manim render returned no result")
-        too_short, actual_manim_duration, duration_ratio = _visual_too_short(rendered, av_sync)
-        logger.info(
-            "[av-sync] word_count=%s estimated_spoken_duration=%s manim_duration=%s ratio=%s visual_steps=%s spoken_segments=%s result=%s",
-            av_sync["word_count"],
-            av_sync["estimated_spoken_duration_seconds"],
-            actual_manim_duration,
-            duration_ratio,
-            av_sync["visual_step_count"],
-            av_sync["spoken_segment_count"],
-            "too_short" if too_short else "ok",
-        )
-        if too_short:
-            duration_error = (
-                "visual_too_short_for_spoken_answer: "
-                f"estimated_spoken_duration_seconds={av_sync['estimated_spoken_duration_seconds']} "
+        duration_policy = _duration_acceptance_policy(rendered, av_sync)
+        actual_manim_duration = duration_policy.get("manim_duration_seconds")
+        duration_ratio = duration_policy.get("duration_ratio")
+        if duration_policy.get("duration_warning"):
+            logger.info(
+                "[av-sync] duration_warning estimated=%s actual=%s ratio=%s accepted=%s reason=%s",
+                duration_policy["estimated_spoken_duration_seconds"],
+                actual_manim_duration,
+                duration_ratio,
+                str(duration_policy.get("duration_accepted")).lower(),
+                duration_policy.get("reason") or "clarity_over_length",
+            )
+        else:
+            logger.info(
+                "[av-sync] duration_ok estimated=%s actual=%s ratio=%s accepted=%s reason=%s",
+                duration_policy["estimated_spoken_duration_seconds"],
+                actual_manim_duration,
+                duration_ratio,
+                str(duration_policy.get("duration_accepted")).lower(),
+                duration_policy.get("reason") or "clarity_over_length",
+            )
+        if duration_policy.get("repair_required") and code_source != "local_fallback":
+            quality_repair_reason = str(duration_policy.get("quality_repair_reason") or "visual_quality_problem")
+            repair_error = (
+                f"{quality_repair_reason}: "
+                f"estimated_spoken_duration_seconds={duration_policy['estimated_spoken_duration_seconds']} "
                 f"actual_manim_duration_seconds={actual_manim_duration} "
                 f"ratio={duration_ratio} "
-                f"required_ratio={MIN_VISUAL_TO_AUDIO_DURATION_RATIO}"
+                f"min_absolute_duration={MIN_ABSOLUTE_MANIM_DURATION_SECONDS} "
+                f"ratio_repair_enabled={AV_SYNC_DURATION_REPAIR_ENABLED}"
             )
-            if code_source == "local_fallback":
-                raise RuntimeError(duration_error)
-            logger.warning("[av-sync] %s; attempting duration repair session=%s title=%s", duration_error, session_id, title)
+            logger.warning("[av-sync] quality_repair_needed reason=%s estimated=%s actual=%s ratio=%s session=%s title=%s", quality_repair_reason, duration_policy["estimated_spoken_duration_seconds"], actual_manim_duration, duration_ratio, session_id, title)
             repair_attempted = True
             repaired = await repair_manim_code_with_error(
                 failed_code=renderer_payload.get("manim_code") or code,
-                error_log=duration_error,
+                error_log=repair_error,
                 spoken_answer=speech_text,
                 visual_plan=visual_plan if isinstance(visual_plan, list) else [],
                 spoken_segments=av_sync.get("spoken_segments") if isinstance(av_sync.get("spoken_segments"), list) else [],
@@ -1613,22 +1769,23 @@ async def _render_teaching_visual(
                 title=title,
             )
             repaired_code = str(repaired.get("manim_code") or "").strip()
-            repaired_error = direct_manim_validation_error(repaired_code) if repaired_code else repaired.get("error") or "empty duration repaired Manim code"
+            repaired_error = direct_manim_validation_error(repaired_code) if repaired_code else repaired.get("error") or "empty quality repaired Manim code"
             if not repaired_code or repaired_error:
-                raise RuntimeError(f"{duration_error}; duration_repair_invalid={repaired_error}")
+                raise RuntimeError(f"{repair_error}; quality_repair_invalid={repaired_error}")
             repair_used = True
             repair_payload = {
                 **renderer_payload,
                 "manim_code": repaired_code,
-                "manim_code_source": repaired.get("source") or "ai_duration_repaired",
+                "manim_code_source": repaired.get("source") or "ai_quality_repaired",
                 "layout_mode": "region_safe" if visual_style == "strict_layout" else "creative_safe",
                 "region_replacement_used": _region_replacement_signal(repaired_code, visual_style),
                 "repair_used": True,
                 "repair_attempted": True,
-                "render_failure_stage": "duration_repair",
+                "render_failure_stage": "quality_repair",
                 "visual_complexity": _visual_complexity_label(visual_plan, repaired_code),
-                "duration_repair_reason": duration_error,
+                "quality_repair_reason": quality_repair_reason,
                 "visible_step_labels_detected": visible_step_labels_detected(repaired_code),
+                **_static_quality_flags(repaired_code, validation_error=None, visual_style=visual_style),
             }
             rendered = await render_manim_payload_async(
                 repair_payload,
@@ -1637,26 +1794,41 @@ async def _render_teaching_visual(
             )
             renderer_payload = repair_payload
             code_source = repair_payload["manim_code_source"]
-            too_short, actual_manim_duration, duration_ratio = _visual_too_short(rendered, av_sync)
+            duration_policy = _duration_acceptance_policy(rendered, av_sync)
+            actual_manim_duration = duration_policy.get("manim_duration_seconds")
+            duration_ratio = duration_policy.get("duration_ratio")
+            if duration_policy.get("repair_required") and quality_repair_reason == "visual_extremely_short":
+                raise RuntimeError(f"{repair_error}; visual_extremely_short_after_repair actual_manim_duration_seconds={actual_manim_duration} ratio={duration_ratio}")
+            duration_policy = {
+                **duration_policy,
+                "duration_accepted": True,
+                "duration_warning_only": bool(duration_policy.get("duration_warning")),
+                "repair_required": False,
+                "reason": "clarity_over_length_after_quality_repair",
+            }
             logger.info(
-                "[av-sync] word_count=%s estimated_spoken_duration=%s manim_duration=%s ratio=%s visual_steps=%s spoken_segments=%s result=%s",
-                av_sync["word_count"],
-                av_sync["estimated_spoken_duration_seconds"],
+                "[av-sync] quality_repair_rendered reason=%s estimated=%s actual=%s ratio=%s accepted=true",
+                quality_repair_reason,
+                duration_policy["estimated_spoken_duration_seconds"],
                 actual_manim_duration,
                 duration_ratio,
-                av_sync["visual_step_count"],
-                av_sync["spoken_segment_count"],
-                "regenerated" if not too_short else "too_short_after_regeneration",
             )
-            if too_short:
-                raise RuntimeError(f"{duration_error}; duration_repair_still_too_short actual_manim_duration_seconds={actual_manim_duration} ratio={duration_ratio}")
+        elif duration_policy.get("repair_required"):
+            duration_policy = {
+                **duration_policy,
+                "duration_accepted": True,
+                "duration_warning_only": bool(duration_policy.get("duration_warning")),
+                "repair_required": False,
+                "reason": "local_fallback_rendered_once",
+            }
         media_url = rendered.get("video_url") or rendered.get("media_url") or rendered.get("public_url")
         media_log_ref = ((rendered.get("storage") or {}).get("object_key") or media_url)
         validation = (rendered.get("payload") or {}).get("manim_code_validation") or rendered.get("validation")
         used_fallback = bool(rendered.get("used_fallback") or (validation or {}).get("fallback_used"))
         logger.info(
-            "[manim-diagnostics] manim_visual_style=%s original_code_render_attempted=%s validation_result=%s repair_attempted=%s fallback_used=%s estimated_audio_duration=%s manim_duration=%s duration_ratio=%s visible_step_labels_detected=%s",
+            "[manim-diagnostics] manim_visual_style=%s visual_quality_mode=%s original_code_render_attempted=%s validation_result=%s repair_attempted=%s fallback_used=%s estimated_audio_duration=%s manim_duration=%s duration_ratio=%s duration_accepted=%s duration_warning_only=%s quality_repair_reason=%s overlap_risk_detected=%s crop_risk_detected=%s persona_style_used=%s visible_step_labels_detected=%s",
             visual_style,
+            _VISUAL_QUALITY_MODE,
             bool((validation or {}).get("original_code_render_attempted", code_source != "local_fallback")),
             (validation or {}).get("validation_result") or ("ok" if not (validation or {}).get("error") else "failed"),
             str(repair_attempted).lower(),
@@ -1664,6 +1836,12 @@ async def _render_teaching_visual(
             av_sync["estimated_spoken_duration_seconds"],
             rendered.get("media_duration_seconds"),
             duration_ratio,
+            str(bool(duration_policy.get("duration_accepted"))).lower(),
+            str(bool(duration_policy.get("duration_warning_only"))).lower(),
+            quality_repair_reason or "",
+            str(bool(renderer_payload.get("overlap_risk_detected"))).lower(),
+            str(bool(renderer_payload.get("crop_risk_detected"))).lower(),
+            str(bool(renderer_payload.get("persona_style_used"))).lower(),
             str(bool((validation or {}).get("visible_step_labels_detected") or renderer_payload.get("visible_step_labels_detected"))).lower(),
         )
         logger.info(
@@ -1690,9 +1868,19 @@ async def _render_teaching_visual(
             "visual_complexity": renderer_payload.get("visual_complexity") or visual_complexity,
             "repair_used": repair_used,
             "repair_attempted": repair_attempted,
+            "quality_repair_reason": quality_repair_reason,
             "estimated_spoken_duration_seconds": av_sync["estimated_spoken_duration_seconds"],
             "manim_duration_seconds": rendered.get("media_duration_seconds"),
             "visual_to_audio_duration_ratio": duration_ratio,
+            "duration_ratio": duration_ratio,
+            "duration_accepted": bool(duration_policy.get("duration_accepted")),
+            "duration_warning_only": bool(duration_policy.get("duration_warning_only")),
+            "fallback_used": used_fallback,
+            "overlap_risk_detected": bool(renderer_payload.get("overlap_risk_detected")),
+            "crop_risk_detected": bool(renderer_payload.get("crop_risk_detected")),
+            "persona_style_used": bool(renderer_payload.get("persona_style_used")),
+            "visible_step_labels_detected": bool((validation or {}).get("visible_step_labels_detected") or renderer_payload.get("visible_step_labels_detected")),
+            "visual_quality_mode": _VISUAL_QUALITY_MODE,
             "spoken_segments_count": av_sync["spoken_segment_count"],
             "visual_steps_count": av_sync["visual_step_count"],
             "error": None,
@@ -1712,9 +1900,18 @@ async def _render_teaching_visual(
                 "visual_complexity": renderer_payload.get("visual_complexity") or visual_complexity,
                 "repair_used": repair_used,
                 "repair_attempted": repair_attempted,
+                "quality_repair_reason": quality_repair_reason,
                 "estimated_spoken_duration_seconds": av_sync["estimated_spoken_duration_seconds"],
                 "manim_duration_seconds": rendered.get("media_duration_seconds"),
                 "visual_to_audio_duration_ratio": duration_ratio,
+                "duration_ratio": duration_ratio,
+                "duration_accepted": bool(duration_policy.get("duration_accepted")),
+                "duration_warning_only": bool(duration_policy.get("duration_warning_only")),
+                "fallback_used": used_fallback,
+                "overlap_risk_detected": bool(renderer_payload.get("overlap_risk_detected")),
+                "crop_risk_detected": bool(renderer_payload.get("crop_risk_detected")),
+                "persona_style_used": bool(renderer_payload.get("persona_style_used")),
+                "visual_quality_mode": _VISUAL_QUALITY_MODE,
                 "spoken_segments_count": av_sync["spoken_segment_count"],
                 "visual_steps_count": av_sync["visual_step_count"],
                 "visible_step_labels_detected": bool((validation or {}).get("visible_step_labels_detected") or renderer_payload.get("visible_step_labels_detected")),
@@ -1731,6 +1928,7 @@ async def _render_teaching_visual(
             spoken_answer=speech_text,
             visual_plan=visual_plan if isinstance(visual_plan, list) else [],
             target_duration_seconds=av_sync["target_visual_duration_seconds"],
+            persona_style_hint=str(debug_payload.get("persona_visual_context") or ""),
         )
         fallback_payload = {
             **renderer_payload,
@@ -1742,9 +1940,13 @@ async def _render_teaching_visual(
             "visual_complexity": _visual_complexity_label(visual_plan, fallback_code),
             "repair_used": repair_used,
             "repair_attempted": repair_attempted,
+            "quality_repair_reason": quality_repair_reason or "primary_render_failed",
             "fallback_attempted": True,
             "render_failure_stage": "fallback",
             "visible_step_labels_detected": visible_step_labels_detected(fallback_code),
+            "persona_style_used": persona_style_used,
+            "visual_quality_mode": _VISUAL_QUALITY_MODE,
+            **_static_quality_flags(fallback_code, validation_error=None, visual_style=visual_style),
             "previous_failure_debug": primary_debug_artifacts,
         }
         try:
@@ -1753,28 +1955,55 @@ async def _render_teaching_visual(
                 segment_id=cache_segment_id,
                 frame_number=1,
             )
-            fallback_too_short, fallback_duration, fallback_ratio = _visual_too_short(rendered, av_sync)
-            logger.info(
-                "[av-sync] word_count=%s estimated_spoken_duration=%s manim_duration=%s ratio=%s visual_steps=%s spoken_segments=%s result=%s",
-                av_sync["word_count"],
-                av_sync["estimated_spoken_duration_seconds"],
-                fallback_duration,
-                fallback_ratio,
-                av_sync["visual_step_count"],
-                av_sync["spoken_segment_count"],
-                "fallback" if not fallback_too_short else "fallback_too_short",
+            fallback_policy = _duration_acceptance_policy(rendered, av_sync)
+            fallback_policy = {
+                **fallback_policy,
+                "duration_accepted": True,
+                "duration_warning_only": bool(fallback_policy.get("duration_warning")),
+                "repair_required": False,
+                "reason": "fallback_quality_over_duration",
+            }
+            fallback_duration = fallback_policy.get("manim_duration_seconds")
+            fallback_ratio = fallback_policy.get("duration_ratio")
+            if fallback_policy.get("duration_warning"):
+                logger.info(
+                    "[av-sync] duration_warning estimated=%s actual=%s ratio=%s accepted=true reason=fallback_quality_over_duration",
+                    fallback_policy["estimated_spoken_duration_seconds"],
+                    fallback_duration,
+                    fallback_ratio,
+                )
+            else:
+                logger.info(
+                    "[av-sync] duration_ok estimated=%s actual=%s ratio=%s accepted=true reason=fallback_quality_over_duration",
+                    fallback_policy["estimated_spoken_duration_seconds"],
+                    fallback_duration,
+                    fallback_ratio,
+                )
+            fallback_payload.update(
+                {
+                    "duration_accepted": True,
+                    "duration_warning_only": bool(fallback_policy.get("duration_warning_only")),
+                    "duration_ratio": fallback_ratio,
+                    "manim_duration_seconds": fallback_duration,
+                }
             )
             media_url = rendered.get("video_url") or rendered.get("media_url") or rendered.get("public_url")
             media_log_ref = ((rendered.get("storage") or {}).get("object_key") or media_url)
             logger.info(
-                "[manim-diagnostics] manim_visual_style=%s original_code_render_attempted=%s validation_result=%s repair_attempted=%s fallback_used=true estimated_audio_duration=%s manim_duration=%s duration_ratio=%s visible_step_labels_detected=%s",
+                "[manim-diagnostics] manim_visual_style=%s visual_quality_mode=%s original_code_render_attempted=%s validation_result=%s repair_attempted=%s fallback_used=true estimated_audio_duration=%s manim_duration=%s duration_ratio=%s duration_accepted=true duration_warning_only=%s quality_repair_reason=%s overlap_risk_detected=%s crop_risk_detected=%s persona_style_used=%s visible_step_labels_detected=%s",
                 visual_style,
+                _VISUAL_QUALITY_MODE,
                 str(code_source != "local_fallback").lower(),
                 "fallback",
                 str(repair_attempted).lower(),
                 av_sync["estimated_spoken_duration_seconds"],
                 rendered.get("media_duration_seconds"),
                 fallback_ratio,
+                str(bool(fallback_policy.get("duration_warning_only"))).lower(),
+                fallback_payload.get("quality_repair_reason") or "",
+                str(bool(fallback_payload.get("overlap_risk_detected"))).lower(),
+                str(bool(fallback_payload.get("crop_risk_detected"))).lower(),
+                str(bool(fallback_payload.get("persona_style_used"))).lower(),
                 str(bool(fallback_payload.get("visible_step_labels_detected"))).lower(),
             )
             logger.info("[manim] local fallback render succeeded session=%s title=%s url=%s", session_id, title, media_log_ref)
@@ -1793,9 +2022,19 @@ async def _render_teaching_visual(
                 "visual_complexity": fallback_payload.get("visual_complexity"),
                 "repair_used": repair_used,
                 "repair_attempted": repair_attempted,
+                "quality_repair_reason": fallback_payload.get("quality_repair_reason"),
                 "estimated_spoken_duration_seconds": av_sync["estimated_spoken_duration_seconds"],
                 "manim_duration_seconds": rendered.get("media_duration_seconds"),
                 "visual_to_audio_duration_ratio": fallback_ratio,
+                "duration_ratio": fallback_ratio,
+                "duration_accepted": True,
+                "duration_warning_only": bool(fallback_policy.get("duration_warning_only")),
+                "fallback_used": True,
+                "overlap_risk_detected": bool(fallback_payload.get("overlap_risk_detected")),
+                "crop_risk_detected": bool(fallback_payload.get("crop_risk_detected")),
+                "persona_style_used": bool(fallback_payload.get("persona_style_used")),
+                "visible_step_labels_detected": bool(fallback_payload.get("visible_step_labels_detected")),
+                "visual_quality_mode": _VISUAL_QUALITY_MODE,
                 "spoken_segments_count": av_sync["spoken_segment_count"],
                 "visual_steps_count": av_sync["visual_step_count"],
                 "error": None,
@@ -1815,9 +2054,18 @@ async def _render_teaching_visual(
                     "visual_complexity": fallback_payload.get("visual_complexity"),
                     "repair_used": repair_used,
                     "repair_attempted": repair_attempted,
+                    "quality_repair_reason": fallback_payload.get("quality_repair_reason"),
                     "estimated_spoken_duration_seconds": av_sync["estimated_spoken_duration_seconds"],
                     "manim_duration_seconds": rendered.get("media_duration_seconds"),
                     "visual_to_audio_duration_ratio": fallback_ratio,
+                    "duration_ratio": fallback_ratio,
+                    "duration_accepted": True,
+                    "duration_warning_only": bool(fallback_policy.get("duration_warning_only")),
+                    "fallback_used": True,
+                    "overlap_risk_detected": bool(fallback_payload.get("overlap_risk_detected")),
+                    "crop_risk_detected": bool(fallback_payload.get("crop_risk_detected")),
+                    "persona_style_used": bool(fallback_payload.get("persona_style_used")),
+                    "visual_quality_mode": _VISUAL_QUALITY_MODE,
                     "spoken_segments_count": av_sync["spoken_segment_count"],
                     "visual_steps_count": av_sync["visual_step_count"],
                     "visible_step_labels_detected": bool(fallback_payload.get("visible_step_labels_detected")),
