@@ -31,6 +31,7 @@ from backend.services.session_manager import (
     send_message,
     set_topic,
 )
+from backend.services.storage_service import url_for_object
 from backend.services.supabase_analytics import track_question_asked, track_session_started
 from backend.store import (
     messages_repo,
@@ -240,6 +241,12 @@ def api_student_video_stream(video_id: str, user: dict = Depends(require_student
     video = videos_repo.get(video_id)
     if not video:
         raise HTTPException(status_code=404, detail="video not found")
+    if video.get("storage_backend") == "s3" and video.get("object_key"):
+        try:
+            return RedirectResponse(url_for_object(str(video["object_key"])), status_code=302)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("failed to create video storage URL video_id=%s: %s", video_id, exc)
+            raise HTTPException(status_code=503, detail="video storage URL unavailable") from exc
     filename = (video.get("filename") or "").strip()
     if not filename:
         raise HTTPException(status_code=404, detail="video file missing")
@@ -267,7 +274,17 @@ async def api_message_audio(session_id: str, message_id: str, user: dict = Depen
     voice_id = (persona or {}).get("voice_id") or PARALLEA_DEFAULT_VOICE_ID
     text = message.get("content") or ""
     try:
-        result = await speak_text(session_id=session_id, text=text, voice_id=voice_id)
+        result = await speak_text(session_id=session_id, text=text, voice_id=voice_id, message_id=message_id)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=503, detail=f"TTS unavailable: {exc}")
-    return {"audio_url": result["audio_url"], "voice_id": voice_id}
+    extra = dict(message.get("extra") or {})
+    storage_meta = dict(result.get("storage") or {})
+    storage_meta.pop("presigned_url", None)
+    extra["audio"] = {
+        "audio_url": result.get("audio_url"),
+        "storage": storage_meta or None,
+        "object_key": result.get("object_key"),
+        "storage_backend": result.get("storage_backend"),
+    }
+    messages_repo.update(message_id, {"extra": extra})
+    return {"audio_url": result["audio_url"], "voice_id": voice_id, "storage": result.get("storage")}

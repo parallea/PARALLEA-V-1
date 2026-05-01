@@ -49,6 +49,7 @@ from backend.store.models import (
     utcnow,
 )
 from backend.services.model_router import llm_json as routed_llm_json
+from backend.services.storage_service import url_for_object
 from transcribe import save_chunks, transcribe_with_timestamps
 
 logger = logging.getLogger("parallea.persona_pipeline")
@@ -406,6 +407,13 @@ def _resolve_video_file(video: dict[str, Any]) -> Optional[Path]:
     return None
 
 
+def _resolve_video_transcription_source(video: dict[str, Any]) -> Optional[str]:
+    if video.get("storage_backend") == "s3" and video.get("object_key"):
+        return url_for_object(str(video["object_key"]))
+    local_file = _resolve_video_file(video)
+    return str(local_file) if local_file else None
+
+
 def _chunks_relative_path(video_id: str) -> str:
     return f"video_{video_id}/chunks.json"
 
@@ -432,9 +440,9 @@ def transcribe_teacher_video(video_id: str) -> dict[str, Any]:
         raise ValueError(f"video {video_id} not found")
     if video.get("has_transcript") and _load_chunks_for_video(video):
         return video
-    src = _resolve_video_file(video)
+    src = _resolve_video_transcription_source(video)
     if not src:
-        _set_status(video_id, "failed", "video file not found on disk")
+        _set_status(video_id, "failed", "video source not found")
         raise FileNotFoundError(f"video file missing: {video.get('filename')}")
     _set_status(video_id, "transcribing", "extracting audio + running ASR")
     chunks = transcribe_with_timestamps(str(src))

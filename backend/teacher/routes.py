@@ -22,6 +22,7 @@ API (JSON, require authenticated teacher):
 from __future__ import annotations
 
 import logging
+import mimetypes
 import shutil
 import uuid
 from datetime import datetime, timezone
@@ -33,6 +34,13 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 
 from backend.auth.dependencies import current_user, require_teacher
 from backend.services.persona_pipeline import process_teacher_video_sync
+from backend.services.storage_service import (
+    allow_local_fallback_for_storage_error,
+    delete_object,
+    safe_object_key,
+    storage_enabled,
+    upload_file,
+)
 from backend.services.video_assets import extract_thumbnail, safe_video_filename
 from backend.store import (
     persona_prompts_repo,
@@ -47,7 +55,7 @@ from backend.store.models import (
     TeacherPersona,
     TeacherVideo,
 )
-from config import AVATAR_PRESETS, BASE_DIR, DATA_DIR, THUMBNAILS_DIR, UPLOADS_DIR
+from config import AVATAR_PRESETS, BASE_DIR, DATA_DIR, THUMBNAILS_DIR, TMP_DIR, UPLOADS_DIR
 
 logger = logging.getLogger("parallea.teacher")
 router = APIRouter()
@@ -137,6 +145,19 @@ def _video_public(video: dict[str, Any]) -> dict[str, Any]:
         "created_at": video.get("created_at"),
         "updated_at": video.get("updated_at"),
     }
+
+
+def _video_content_type(filename: str, upload_content_type: str | None = None) -> str:
+    return (upload_content_type or mimetypes.guess_type(filename)[0] or "video/mp4").strip()
+
+
+def _teacher_video_object_key(teacher_id: str, video_id: str, filename: str) -> str:
+    suffix = Path(filename).suffix.lower() or ".mp4"
+    return safe_object_key("teacher-videos", teacher_id, video_id, f"original{suffix}")
+
+
+def _teacher_thumbnail_object_key(teacher_id: str, video_id: str) -> str:
+    return safe_object_key("teacher-videos", teacher_id, video_id, "thumbnail.jpg")
 
 
 def _roadmap_full(roadmap: dict[str, Any]) -> dict[str, Any]:
@@ -380,17 +401,89 @@ async def api_upload_video(
         personas_repo.update(persona["id"], persona_updates)
         persona = personas_repo.get(persona["id"])
 
-    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    THUMBNAILS_DIR.mkdir(parents=True, exist_ok=True)
-
     video_id = uuid.uuid4().hex[:8]
     filename = safe_video_filename(video_id, file.filename)
-    out_path = UPLOADS_DIR / filename
+    use_object_storage = storage_enabled()
+    upload_root = TMP_DIR / "teacher_uploads" / video_id if use_object_storage else UPLOADS_DIR
+    thumbnail_root = TMP_DIR / "teacher_uploads" / video_id if use_object_storage else THUMBNAILS_DIR
+    upload_root.mkdir(parents=True, exist_ok=True)
+    thumbnail_root.mkdir(parents=True, exist_ok=True)
+
+    out_path = upload_root / filename
     with out_path.open("wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    thumb_path = THUMBNAILS_DIR / f"{video_id}.jpg"
+    thumb_path = thumbnail_root / f"{video_id}.jpg"
     thumb_ok = extract_thumbnail(out_path, thumb_path)
+    video_content_type = _video_content_type(filename, file.content_type)
+    video_size_bytes = out_path.stat().st_size if out_path.exists() else 0
+
+    storage_fields: dict[str, Any] = {
+        "storage_backend": "local",
+        "content_type": video_content_type,
+        "size_bytes": video_size_bytes,
+        "original_video_url": None,
+        "thumbnail_url": f"/thumbnail/{video_id}" if thumb_ok else None,
+    }
+
+    if use_object_storage:
+        try:
+            video_key = _teacher_video_object_key(user["id"], video_id, filename)
+            stored_video = upload_file(
+                out_path,
+                video_key,
+                content_type=video_content_type,
+                metadata={"teacher_id": user["id"], "video_id": video_id, "kind": "teacher_video"},
+            )
+            storage_fields.update(
+                {
+                    "storage_backend": stored_video.backend,
+                    "object_key": stored_video.object_key,
+                    "original_video_url": stored_video.public_url,
+                    "content_type": stored_video.content_type,
+                    "size_bytes": stored_video.size_bytes,
+                }
+            )
+            if thumb_ok:
+                thumb_key = _teacher_thumbnail_object_key(user["id"], video_id)
+                stored_thumb = upload_file(
+                    thumb_path,
+                    thumb_key,
+                    content_type="image/jpeg",
+                    metadata={"teacher_id": user["id"], "video_id": video_id, "kind": "teacher_thumbnail"},
+                )
+                storage_fields.update(
+                    {
+                        "thumbnail_url": f"/thumbnail/{video_id}",
+                        "thumbnail_object_key": stored_thumb.object_key,
+                        "thumbnail_storage_backend": stored_thumb.backend,
+                        "thumbnail_storage_url": stored_thumb.public_url,
+                        "thumbnail_content_type": stored_thumb.content_type,
+                        "thumbnail_size_bytes": stored_thumb.size_bytes,
+                    }
+                )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("teacher video object storage upload failed video_id=%s: %s", video_id, exc)
+            if not allow_local_fallback_for_storage_error():
+                shutil.rmtree(upload_root, ignore_errors=True)
+                raise HTTPException(status_code=503, detail=f"Video storage upload failed: {exc}") from exc
+            UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+            THUMBNAILS_DIR.mkdir(parents=True, exist_ok=True)
+            local_video_path = UPLOADS_DIR / filename
+            shutil.copy2(out_path, local_video_path)
+            if thumb_ok:
+                shutil.copy2(thumb_path, THUMBNAILS_DIR / f"{video_id}.jpg")
+            shutil.rmtree(upload_root, ignore_errors=True)
+            storage_fields.update(
+                {
+                    "storage_backend": "local",
+                    "object_key": None,
+                    "original_video_url": None,
+                    "thumbnail_url": f"/thumbnail/{video_id}" if thumb_ok else None,
+                }
+            )
+        else:
+            shutil.rmtree(upload_root, ignore_errors=True)
 
     payload = TeacherVideo(
         id=video_id,
@@ -402,7 +495,7 @@ async def api_upload_video(
         creator_name=(teacher_name or persona.get("teacher_name") or user.get("name") or "Teacher")[:120],
         creator_profession=(profession or persona.get("profession") or "")[:200],
         filename=filename,
-        thumbnail_url=f"/thumbnail/{video_id}" if thumb_ok else None,
+        **storage_fields,
         status="uploaded",
         status_message="queued for processing",
     )
@@ -455,6 +548,11 @@ def api_delete_video(video_id: str, user: dict = Depends(require_teacher)):
             roadmap_parts_repo.delete(p["id"])
         roadmaps_repo.delete(r["id"])
     # Remove physical assets best-effort
+    if video.get("storage_backend") == "s3":
+        if video.get("object_key"):
+            delete_object(str(video["object_key"]))
+        if video.get("thumbnail_object_key"):
+            delete_object(str(video["thumbnail_object_key"]))
     if video.get("filename"):
         path = UPLOADS_DIR / video["filename"]
         if path.exists():

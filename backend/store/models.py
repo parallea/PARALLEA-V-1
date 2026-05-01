@@ -102,6 +102,15 @@ class TeacherVideo:
     filename: str = ""
     original_video_url: Optional[str] = None
     thumbnail_url: Optional[str] = None
+    storage_backend: str = "local"
+    object_key: Optional[str] = None
+    content_type: Optional[str] = None
+    size_bytes: Optional[int] = None
+    thumbnail_object_key: Optional[str] = None
+    thumbnail_storage_backend: Optional[str] = None
+    thumbnail_storage_url: Optional[str] = None
+    thumbnail_content_type: Optional[str] = None
+    thumbnail_size_bytes: Optional[int] = None
     transcript: Optional[str] = None  # full transcript text (chunks live elsewhere)
     chunks_path: Optional[str] = None  # relative path under DATA_DIR
     has_transcript: bool = False

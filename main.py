@@ -54,7 +54,6 @@ from voice import (
     speak_segments,
     speak_text,
     stt_provider_status,
-    synthesize_to_file,
     transcribe_question,
     transcribe_question_result,
     tts_provider_status,
@@ -89,6 +88,8 @@ from backend.auth.admin import log_admin_auth_status  # noqa: E402
 from backend.auth.oauth import register_oauth_state_middleware  # noqa: E402
 from backend.admin import admin_router  # noqa: E402
 from backend.services.supabase_analytics import log_supabase_analytics_status  # noqa: E402
+from backend.services.storage_service import LOCAL_STORAGE_DIR, log_storage_status, storage_status, url_for_object  # noqa: E402
+from backend.store import videos_repo as teacher_videos_repo  # noqa: E402
 from backend.teacher import teacher_router  # noqa: E402
 from backend.student import student_router  # noqa: E402
 register_oauth_state_middleware(app)
@@ -116,14 +117,18 @@ DEV_VOICE_TEST_HTML = BASE_DIR / "dev-voice-test.html"
 BOARD_ASSETS_DIR = BASE_DIR / "board_assets"
 
 app.mount("/board-assets", StaticFiles(directory=str(BOARD_ASSETS_DIR), check_dir=False), name="board-assets")
-if MANIM_PUBLIC_BASE_URL and MANIM_PUBLIC_BASE_URL != "/rendered-scenes":
+if MANIM_PUBLIC_BASE_URL.startswith("/") and MANIM_PUBLIC_BASE_URL != "/rendered-scenes":
     app.mount(
         MANIM_PUBLIC_BASE_URL,
         StaticFiles(directory=str(MANIM_PUBLIC_OUTPUT_DIR), check_dir=False),
         name="rendered-scenes-manim",
     )
+elif MANIM_PUBLIC_BASE_URL and not MANIM_PUBLIC_BASE_URL.startswith("/"):
+    logger = logging.getLogger("parallea")
+    logger.warning("MANIM_PUBLIC_BASE_URL is not a local mount path; skipping StaticFiles mount value=%s", MANIM_PUBLIC_BASE_URL)
 app.mount("/rendered-scenes", StaticFiles(directory=str(RENDERS_DIR), check_dir=False), name="rendered-scenes")
 app.mount("/generated", StaticFiles(directory=str(PUBLIC_DIR / "generated"), check_dir=False), name="generated")
+app.mount("/storage", StaticFiles(directory=str(LOCAL_STORAGE_DIR), check_dir=False), name="storage")
 
 _sessions: Dict[str, Dict[str, Any]] = {}
 _audio_jobs: Dict[str, Dict[str, Any]] = {}
@@ -247,11 +252,16 @@ async def run_audio_job(
 ) -> None:
     job = _audio_jobs.setdefault(job_id, {"job_id": job_id, "ready": False, "url": None, "error": None})
     try:
-        filename = f"{job_id}{TTS_AUDIO_EXTENSION}"
-        out_path = AUDIO_DIR / filename
-        await synthesize_to_file(text=text, voice_id=voice_id, lang=lang, out_path=out_path, fallback_voice=fallback_voice)
+        audio = await speak_text(
+            session_id="jobs",
+            text=text,
+            voice_id=voice_id,
+            lang=lang,
+            fallback_voice=fallback_voice,
+            message_id=job_id,
+        )
         job["ready"] = True
-        job["url"] = f"/audio-response/{filename}"
+        job["url"] = audio.get("audio_url")
         job["error"] = None
     except Exception as exc:
         job["ready"] = False
@@ -1617,6 +1627,7 @@ async def startup():
     logger.info("startup ai-config provider=openai pipeline=%s", openai_pipeline_status())
     log_admin_auth_status()
     log_supabase_analytics_status()
+    log_storage_status()
     manim_info = log_manim_runtime_status()
     diag = tts_diagnostics()
     if diag["configured"]:
@@ -1630,6 +1641,11 @@ async def startup():
 def health():
     diag = tts_diagnostics()
     return {"status": "ok", "videos": len(load_videos()), "tts": diag, "manim": manim_runtime_info(), "openai": openai_pipeline_status()}
+
+
+@app.get("/health/storage")
+def health_storage():
+    return {"status": "ok", "storage": storage_status()}
 
 
 @app.get("/health/manim")
@@ -1884,6 +1900,13 @@ def video_meta(request: Request, video_id: str):  # noqa: ARG001
 
 @app.get("/thumbnail/{video_id}")
 def thumbnail(video_id: str):
+    teacher_video = teacher_videos_repo.get(video_id)
+    if teacher_video and teacher_video.get("thumbnail_storage_backend") == "s3" and teacher_video.get("thumbnail_object_key"):
+        try:
+            return RedirectResponse(url_for_object(str(teacher_video["thumbnail_object_key"])), status_code=302)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("thumbnail storage URL unavailable video_id=%s: %s", video_id, exc)
+            raise HTTPException(status_code=503, detail="Thumbnail storage URL unavailable") from exc
     path = THUMBNAILS_DIR / f"{video_id}.jpg"
     if not path.exists():
         raise HTTPException(status_code=404, detail="Thumbnail not found")
@@ -1891,7 +1914,14 @@ def thumbnail(video_id: str):
 
 @app.get("/video/{video_id}")
 def stream_video(video_id: str, request: Request):
-    video = find_video(video_id)
+    teacher_video = teacher_videos_repo.get(video_id)
+    if teacher_video and teacher_video.get("storage_backend") == "s3" and teacher_video.get("object_key"):
+        try:
+            return RedirectResponse(url_for_object(str(teacher_video["object_key"])), status_code=302)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("video storage URL unavailable video_id=%s: %s", video_id, exc)
+            raise HTTPException(status_code=503, detail="Video storage URL unavailable") from exc
+    video = teacher_video or find_video(video_id)
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
     path = UPLOADS_DIR / video["filename"]

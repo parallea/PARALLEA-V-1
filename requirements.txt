@@ -5,6 +5,8 @@ edge-tts
 openai
 groq
 assemblyai
+manim
+boto3
 openai-whisper
 torch
 sentence-transformers

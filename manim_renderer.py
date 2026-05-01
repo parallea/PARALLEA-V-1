@@ -28,6 +28,12 @@ from config import (
     MANIM_RUNTIME_DIR,
     RENDERS_DIR,
 )
+from backend.services.storage_service import (
+    allow_local_fallback_for_storage_error,
+    safe_object_key,
+    storage_enabled,
+    upload_file,
+)
 
 
 logger = logging.getLogger("parallea.manim")
@@ -67,6 +73,20 @@ SAFE_COLOR_CONSTANTS = "WHITE, BLACK, BLUE, BLUE_E, GREEN, GREEN_E, RED, RED_E, 
 
 for path in [MANIM_DIR, MANIM_SCENES_DIR, MANIM_WORK_DIR, MANIM_OUTPUT_DIR, MANIM_LOG_DIR, MANIM_HEALTH_DIR]:
     path.mkdir(parents=True, exist_ok=True)
+
+
+def directory_writable(path: Path) -> dict[str, Any]:
+    info: dict[str, Any] = {"path": str(path), "exists": path.exists(), "writable": False, "error": ""}
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / f".write_probe_{os.getpid()}_{int(time.time() * 1000)}"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        info["exists"] = True
+        info["writable"] = True
+    except Exception as exc:  # noqa: BLE001
+        info["error"] = repr(exc)
+    return info
 
 
 def clean_spaces(text: Any) -> str:
@@ -170,6 +190,50 @@ def path_to_public_url(file_path: Path) -> str:
         return f"/rendered-scenes/{Path(rel).as_posix()}"
     except Exception:
         return f"{MANIM_PUBLIC_BASE_URL}/{Path(file_path).name}"
+
+
+def manim_storage_enabled() -> bool:
+    return storage_enabled()
+
+
+def _manim_object_key(payload: dict[str, Any] | None, segment_id: str, key: str) -> str:
+    data = payload or {}
+    session_id = data.get("storage_session_id") or data.get("session_id") or segment_id or "session"
+    message_id = data.get("storage_message_id") or data.get("message_id") or "message"
+    render_id = data.get("storage_render_id") or data.get("render_id") or key
+    return safe_object_key("manim-renders", session_id, message_id, f"{render_id}.mp4")
+
+
+def _publish_manim_video(
+    final_video: Path,
+    *,
+    payload: dict[str, Any] | None,
+    segment_id: str,
+    key: str,
+) -> tuple[str, dict[str, Any] | None]:
+    if not storage_enabled():
+        cache_bust = int(final_video.stat().st_mtime) if final_video.exists() else 0
+        media_url_no_bust = path_to_public_url(final_video)
+        media_url = f"{media_url_no_bust}?v={cache_bust}" if cache_bust else media_url_no_bust
+        return media_url, None
+    object_key = _manim_object_key(payload, segment_id, key)
+    try:
+        stored = upload_file(
+            final_video,
+            object_key,
+            content_type="video/mp4",
+            metadata={"kind": "manim_render", "segment_id": segment_id, "render_key": key},
+        )
+        final_video.unlink(missing_ok=True)
+        return stored.url or "", stored.to_dict()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("manim storage upload failed key=%s object_key=%s: %s", key, object_key, exc)
+        if allow_local_fallback_for_storage_error():
+            cache_bust = int(final_video.stat().st_mtime) if final_video.exists() else 0
+            media_url_no_bust = path_to_public_url(final_video)
+            media_url = f"{media_url_no_bust}?v={cache_bust}" if cache_bust else media_url_no_bust
+            return media_url, {"backend": "local", "object_key": None, "error": str(exc)}
+        raise
 
 
 def command_to_string(command: list[str]) -> str:
@@ -393,6 +457,15 @@ def risky_python_version(version_text: str) -> bool:
 def manim_runtime_info() -> dict[str, Any]:
     python_exec = resolve_manim_python()
     latex_info = latex_runtime_info()
+    ffmpeg_path = shutil.which("ffmpeg")
+    runtime_dirs = {
+        "runtime": directory_writable(MANIM_RUNTIME_DIR),
+        "scenes": directory_writable(MANIM_SCENES_DIR),
+        "work": directory_writable(MANIM_WORK_DIR),
+        "output": directory_writable(MANIM_OUTPUT_DIR),
+        "debug_logs": directory_writable(MANIM_LOG_DIR),
+        "health": directory_writable(MANIM_HEALTH_DIR),
+    }
     info = {
         "python_executable": str(python_exec),
         "python_version": "",
@@ -400,10 +473,14 @@ def manim_runtime_info() -> dict[str, Any]:
         "manim_version": None,
         "manim_import_error": None,
         "risky_python": False,
+        "ffmpeg_available": bool(ffmpeg_path),
+        "ffmpeg_path": ffmpeg_path or "",
         "latex_available": bool(latex_info.get("latex_available")),
         "latex_path": latex_info.get("latex_path") or "",
         "dvisvgm_available": bool(latex_info.get("dvisvgm_available")),
         "dvisvgm_path": latex_info.get("dvisvgm_path") or "",
+        "runtime_directories_writable": all(item.get("writable") for item in runtime_dirs.values()),
+        "runtime_directories": runtime_dirs,
         "manim_allow_mathtex": MANIM_ALLOW_MATHTEX,
         "manim_allow_mathtex_effective": manim_allow_mathtex_effective_value(),
         "manim_require_latex": MANIM_REQUIRE_LATEX,
@@ -447,15 +524,22 @@ def manim_runtime_info() -> dict[str, Any]:
 def log_manim_runtime_status() -> dict[str, Any]:
     info = manim_runtime_info()
     logger.info(
-        "manim-runtime python=%s version=%s manim_importable=%s manim_version=%s runtime_dir=%s latex_available=%s mathtex_effective=%s",
+        "manim-runtime python=%s version=%s manim_importable=%s manim_version=%s ffmpeg_available=%s latex_available=%s dvisvgm_available=%s runtime_dirs_writable=%s runtime_dir=%s mathtex_effective=%s",
         info.get("python_executable"),
         info.get("python_version"),
         info.get("manim_importable"),
         info.get("manim_version"),
-        MANIM_RUNTIME_DIR,
+        info.get("ffmpeg_available"),
         info.get("latex_available"),
+        info.get("dvisvgm_available"),
+        info.get("runtime_directories_writable"),
+        MANIM_RUNTIME_DIR,
         info.get("manim_allow_mathtex_effective"),
     )
+    if not info.get("ffmpeg_available"):
+        logger.error("manim-runtime ffmpeg was not found in PATH")
+    if not info.get("runtime_directories_writable"):
+        logger.error("manim-runtime directories are not all writable: %s", info.get("runtime_directories"))
     if info.get("latex_required_missing"):
         logger.error("manim-runtime MANIM_REQUIRE_LATEX=1 but latex/dvisvgm were not found in PATH")
     if info.get("risky_python"):
@@ -1638,9 +1722,7 @@ def run_manim_scene(
         ),
     )
     used_fallback = bool((payload or {}).get("_render_fallback_retry") or ((payload or {}).get("manim_code_validation") or {}).get("fallback_used"))
-    cache_bust = int(final_video.stat().st_mtime) if final_video.exists() else 0
-    media_url_no_bust = path_to_public_url(final_video)
-    media_url = f"{media_url_no_bust}?v={cache_bust}" if cache_bust else media_url_no_bust
+    media_url, stored_object = _publish_manim_video(final_video, payload=payload, segment_id=segment_id, key=key)
     write_text_file(
         public_meta,
         json.dumps(
@@ -1656,6 +1738,7 @@ def run_manim_scene(
                 "command": command_text,
                 "render_time_sec": render_time_sec,
                 "used_fallback": used_fallback,
+                "storage": stored_object,
                 "latex_available": has_latex_available(),
                 "text_only_mode": manim_text_only_mode(),
             },
@@ -1669,7 +1752,7 @@ def run_manim_scene(
         frame_number,
         render_time_sec,
         final_video,
-        media_url,
+        (stored_object or {}).get("object_key") or media_url,
         scene_file,
         debug_paths["meta_path"],
     )
@@ -1687,6 +1770,7 @@ def run_manim_scene(
         "render_time_sec": render_time_sec,
         "cache_hit": False,
         "used_fallback": used_fallback,
+        "storage": stored_object,
         "payload": payload,
     }
 
@@ -1720,7 +1804,7 @@ def render_manim_payload(
     work_dir = MANIM_WORK_DIR / key
     segment_label = clean_spaces(segment_id) or payload.get("segment_id") or f"frame_{frame_number or 0}"
 
-    if final_video.exists() and final_video.stat().st_size > 0:
+    if not storage_enabled() and final_video.exists() and final_video.stat().st_size > 0:
         scene_file, render_log, metadata_file = public_artifact_paths(final_video, key)
         cache_bust = int(final_video.stat().st_mtime)
         media_url = f"{path_to_public_url(final_video)}?v={cache_bust}"

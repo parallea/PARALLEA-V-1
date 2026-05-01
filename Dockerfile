@@ -8,7 +8,23 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        dvisvgm \
+        ffmpeg \
+        ghostscript \
+        libcairo2-dev \
+        libffi-dev \
+        libgdk-pixbuf-2.0-0 \
+        libglib2.0-0 \
+        libgl1 \
+        libpango1.0-dev \
+        pkg-config \
+        shared-mime-info \
+        texlive-fonts-recommended \
+        texlive-latex-base \
+        texlive-latex-extra \
+        texlive-science \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements.txt

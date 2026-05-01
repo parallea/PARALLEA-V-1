@@ -55,6 +55,7 @@ from backend.store.models import (
     MissingTopicRequest,
     StudentMessage,
     StudentSession,
+    new_id,
     utcnow,
 )
 from manim_renderer import direct_manim_validation_error
@@ -146,9 +147,9 @@ def _confirm_persona_only_text(topic: str) -> str:
     )
 
 
-def _record_message(session_id: str, role: str, content: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+def _record_message(session_id: str, role: str, content: str, extra: dict[str, Any] | None = None, message_id: str | None = None) -> dict[str, Any]:
     message = messages_repo.create(
-        StudentMessage(session_id=session_id, role=role, content=content, extra=extra or {})
+        StudentMessage(id=message_id or new_id("msg"), session_id=session_id, role=role, content=content, extra=extra or {})
     )
     _sync_session_memory_after_message(session_id, role=role, content=content, extra=extra or {})
     return message
@@ -973,9 +974,11 @@ async def _clarify_current_roadmap_part(session_id: str, student_text: str) -> d
         len(speech_segments),
         len(visual_segments),
     )
+    assistant_message_id = new_id("msg")
     visual = await _render_teaching_visual(
         session_id,
         payload,
+        message_id=assistant_message_id,
         student_query=student_text,
         title=part.get("title") or "Clarification",
         subtitle=((part.get("suggested_visuals") or [part.get("summary") or "Visual clarification"])[0]),
@@ -1003,6 +1006,7 @@ async def _clarify_current_roadmap_part(session_id: str, student_text: str) -> d
             "debug": payload.get("debug") or {},
             "visual": visual,
         },
+        message_id=assistant_message_id,
     )
     sessions_repo.update(session_id, {"state": "awaiting_clarification_feedback"})
     logger.info(
@@ -1035,6 +1039,7 @@ async def _render_teaching_visual(
     session_id: str,
     payload: dict[str, Any],
     *,
+    message_id: str | None = None,
     student_query: str = "",
     title: str = "Visual explanation",
     subtitle: str = "Visual clarification",
@@ -1111,6 +1116,8 @@ async def _render_teaching_visual(
         "subtitle": subtitle or "Visual clarification",
         "duration_sec": 12,
         "segment_id": cache_segment_id,
+        "storage_session_id": session_id,
+        "storage_message_id": message_id or "message",
         "student_query": student_query,
         "visual_prompt": visual_prompt,
         "manim_code_source": code_source,
@@ -1157,11 +1164,12 @@ async def _render_teaching_visual(
         if not rendered:
             raise RuntimeError("Manim render returned no result")
         media_url = rendered.get("video_url") or rendered.get("media_url") or rendered.get("public_url")
+        media_log_ref = ((rendered.get("storage") or {}).get("object_key") or media_url)
         validation = (rendered.get("payload") or {}).get("manim_code_validation") or rendered.get("validation")
         used_fallback = bool(rendered.get("used_fallback") or (validation or {}).get("fallback_used"))
         logger.info(
             "[manim] public_url=%s used_fallback=%s code_source=%s cache_hit=%s session=%s title=%s",
-            media_url,
+            media_log_ref,
             used_fallback,
             code_source,
             bool(rendered.get("cache_hit")),
@@ -1180,9 +1188,11 @@ async def _render_teaching_visual(
             "error": None,
             "timestamps": timestamps,
             "syncPlan": sync_plan,
+            "storage": rendered.get("storage"),
             "payload": {
                 "media_url": media_url,
                 "video_url": media_url,
+                "storage": rendered.get("storage"),
                 "duration_sec": renderer_payload["duration_sec"],
                 "used_fallback": used_fallback,
                 "manim_code_source": code_source,
@@ -1211,7 +1221,8 @@ async def _render_teaching_visual(
                 frame_number=1,
             )
             media_url = rendered.get("video_url") or rendered.get("media_url") or rendered.get("public_url")
-            logger.info("[manim] local fallback render succeeded session=%s title=%s url=%s", session_id, title, media_url)
+            media_log_ref = ((rendered.get("storage") or {}).get("object_key") or media_url)
+            logger.info("[manim] local fallback render succeeded session=%s title=%s url=%s", session_id, title, media_log_ref)
             return {
                 "type": "manim",
                 "visualType": "manim",
@@ -1224,9 +1235,11 @@ async def _render_teaching_visual(
                 "error": None,
                 "timestamps": timestamps,
                 "syncPlan": sync_plan,
+                "storage": rendered.get("storage"),
                 "payload": {
                     "media_url": media_url,
                     "video_url": media_url,
+                    "storage": rendered.get("storage"),
                     "duration_sec": fallback_payload["duration_sec"],
                     "used_fallback": True,
                     "manim_code_source": "local_fallback",
@@ -1294,9 +1307,11 @@ async def _answer_persona_only(session_id: str, student_text: str) -> dict[str, 
         session_memory=prompt_memory,
         previous_assistant_answer=previous_answer,
     )
+    assistant_message_id = new_id("msg")
     visual = await _render_teaching_visual(
         session_id,
         payload,
+        message_id=assistant_message_id,
         student_query=student_text,
         title=topic or "Persona-only teaching",
         subtitle="Interactive Manim explanation",
@@ -1321,6 +1336,7 @@ async def _answer_persona_only(session_id: str, student_text: str) -> dict[str, 
             "debug": payload.get("debug") or {},
             "visual": visual,
         },
+        message_id=assistant_message_id,
     )
     return _envelope(sessions_repo.get(session_id), msg, prompt_for="reply", visual=visual)
 

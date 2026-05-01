@@ -544,7 +544,7 @@ def render_manim_payload(
     work_dir = legacy_renderer.MANIM_WORK_DIR / key
     segment_label = clean_spaces(segment_id) or clean_spaces(payload.get("segment_id")) or f"frame_{frame_number or 0}"
 
-    if final_video.exists() and final_video.stat().st_size > 0:
+    if not legacy_renderer.manim_storage_enabled() and final_video.exists() and final_video.stat().st_size > 0:
         scene_file = legacy_renderer.MANIM_SCENES_DIR / f"{key}.py"
         cache_bust = int(final_video.stat().st_mtime)
         media_url = f"{legacy_renderer.path_to_public_url(final_video)}?v={cache_bust}"

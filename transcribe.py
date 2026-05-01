@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+from urllib.parse import urlparse
 
 from config import (
     ASSEMBLYAI_API_KEY,
@@ -39,6 +40,11 @@ def _extract_audio(video_path: str) -> str:
     cmd = [ffmpeg, "-y", "-i", video_path, "-vn", "-ac", "1", "-ar", "16000", "-acodec", "pcm_s16le", wav_path]
     subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return wav_path
+
+
+def _is_url(value: str) -> bool:
+    parsed = urlparse(str(value or ""))
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
 def _is_production_like_env() -> bool:
@@ -136,10 +142,10 @@ def _load_assemblyai():
     return aai
 
 
-def _assemblyai_chunks(wav_path: str, interval: int = 10):
+def _assemblyai_chunks(audio_source: str, interval: int = 10):
     aai = _load_assemblyai()
     config = aai.TranscriptionConfig(speech_models=[aai.SpeechModel.universal])
-    transcript = aai.Transcriber().transcribe(wav_path, config=config)
+    transcript = aai.Transcriber().transcribe(audio_source, config=config)
     if transcript.status == aai.TranscriptStatus.error:
         raise RuntimeError(f"AssemblyAI transcription failed: {transcript.error}")
     chunks = {}
@@ -249,6 +255,9 @@ def _whisper_chunks(wav_path: str, interval: int = 10):
 
 def transcribe_with_timestamps(video_path: str, interval: int = 10):
     provider = log_teacher_transcription_status()
+    if provider == "assemblyai" and _is_url(video_path):
+        logger.info("teacher transcription using AssemblyAI remote media URL")
+        return _assemblyai_chunks(video_path, interval=interval)
     wav_path = _extract_audio(video_path)
     try:
         if provider == "assemblyai":

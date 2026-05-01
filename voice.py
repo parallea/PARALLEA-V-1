@@ -28,7 +28,16 @@ from config import (
     STT_LANGUAGE,
     STT_MODEL,
     STT_PROVIDER,
+    TMP_DIR,
     TTS_AUDIO_EXTENSION,
+)
+from backend.services.storage_service import (
+    allow_local_fallback_for_storage_error,
+    object_exists,
+    safe_object_key,
+    storage_enabled,
+    upload_file,
+    url_for_object,
 )
 
 
@@ -490,17 +499,65 @@ async def synthesize_to_file(
     raise RuntimeError("Edge TTS synthesis failed. " + " | ".join(errors))
 
 
+def _audio_local_url(filename: str) -> str:
+    return f"/audio-response/{filename}"
+
+
+def _audio_work_dir() -> Path:
+    return (TMP_DIR / "audio") if storage_enabled() else AUDIO_DIR
+
+
+def _audio_object_key(session_id: str, filename: str, *, message_id: str | None = None, prefix: str = "") -> str:
+    name = f"{message_id}{TTS_AUDIO_EXTENSION}" if message_id else filename
+    parts = ["audio-responses"]
+    if prefix:
+        parts.append(prefix)
+    parts.extend([session_id or "session", name])
+    return safe_object_key(*parts)
+
+
+def _publish_audio_file(out_path: Path, filename: str, object_key: str) -> dict:
+    if not storage_enabled():
+        return {"filename": filename, "audio_url": _audio_local_url(filename)}
+    try:
+        stored = upload_file(
+            out_path,
+            object_key,
+            content_type="audio/mpeg",
+            metadata={"kind": "audio_response"},
+        )
+        out_path.unlink(missing_ok=True)
+        return {
+            "filename": filename,
+            "audio_url": stored.url,
+            "storage": stored.to_dict(),
+            "object_key": stored.object_key,
+            "storage_backend": stored.backend,
+        }
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("audio storage upload failed file=%s key=%s: %s", filename, object_key, exc)
+        if allow_local_fallback_for_storage_error():
+            local_path = AUDIO_DIR / filename
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            if out_path.resolve() != local_path.resolve():
+                shutil.copy2(out_path, local_path)
+            return {"filename": filename, "audio_url": _audio_local_url(filename), "storage_error": str(exc)}
+        raise
+
+
 async def speak_text(
     session_id: str,
     text: str,
     voice_id: str,
     lang: str = "en-us",
     fallback_voice: str | None = None,
+    message_id: str | None = None,
 ) -> dict:
     filename = f"{session_id}_{uuid.uuid4().hex}{TTS_AUDIO_EXTENSION}"
-    out_path = AUDIO_DIR / filename
+    out_path = _audio_work_dir() / filename
     await synthesize_to_file(text=text, voice_id=voice_id, lang=lang, out_path=out_path, fallback_voice=fallback_voice)
-    return {"filename": filename, "audio_url": f"/audio-response/{filename}"}
+    object_key = _audio_object_key(session_id, filename, message_id=message_id)
+    return _publish_audio_file(out_path, filename, object_key)
 
 
 async def speak_cached(
@@ -512,10 +569,18 @@ async def speak_cached(
 ) -> dict:
     safe_key = "".join(ch if ch.isalnum() or ch in {"_", "-"} else "_" for ch in cache_key).strip("_") or "cached_audio"
     filename = f"{safe_key}{TTS_AUDIO_EXTENSION}"
-    out_path = AUDIO_DIR / filename
+    out_path = _audio_work_dir() / filename
+    object_key = _audio_object_key("cached", filename)
+    if storage_enabled() and object_exists(object_key):
+        return {
+            "filename": filename,
+            "audio_url": url_for_object(object_key),
+            "object_key": object_key,
+            "storage_backend": "s3",
+        }
     if not out_path.exists() or out_path.stat().st_size <= 0:
         await synthesize_to_file(text=text, voice_id=voice_id, lang=lang, out_path=out_path, fallback_voice=fallback_voice)
-    return {"filename": filename, "audio_url": f"/audio-response/{filename}"}
+    return _publish_audio_file(out_path, filename, object_key)
 
 
 async def speak_segments(
@@ -534,13 +599,16 @@ async def speak_segments(
             continue
         segment_id = "".join(ch if ch.isalnum() or ch in {"_", "-"} else "_" for ch in str(segment.get("segment_id") or f"segment_{idx}"))
         filename = f"{session_id}_{segment_id}_{uuid.uuid4().hex}{TTS_AUDIO_EXTENSION}"
-        out_path = AUDIO_DIR / filename
+        out_path = _audio_work_dir() / filename
         await synthesize_to_file(text=text, voice_id=voice_id, lang=lang, out_path=out_path, fallback_voice=fallback_voice)
+        object_key = _audio_object_key(session_id, filename)
+        published = _publish_audio_file(out_path, filename, object_key)
         results.append(
             {
                 "segment_id": segment.get("segment_id") or f"segment_{idx}",
                 "text": text,
-                "audio_url": f"/audio-response/{filename}",
+                "audio_url": published.get("audio_url"),
+                "storage": published.get("storage"),
             }
         )
     return results
