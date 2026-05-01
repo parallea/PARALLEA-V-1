@@ -113,21 +113,21 @@ AUDIO_DIR = env_path("PARALLEA_AUDIO_DIR", DEFAULT_RUNTIME_ROOT / "audio", BASE_
 SESSIONS_DIR = env_path("PARALLEA_SESSIONS_DIR", DATA_DIR / "sessions", DATA_DIR)
 VIDEOS_DB = env_path("PARALLEA_VIDEOS_DB", DATA_DIR / "videos.json", DATA_DIR)
 RENDERS_DIR = env_path("PARALLEA_RENDERS_DIR", DATA_DIR / "renders", DATA_DIR)
-DEFAULT_MANIM_RUNTIME_DIR = DEFAULT_RUNTIME_ROOT / "manim_runtime"
+DEFAULT_MANIM_RUNTIME_DIR = DATA_DIR / "manim_runtime"
 MANIM_RUNTIME_DIR = env_path(
     "MANIM_RUNTIME_DIR",
     env_path("PARALLEA_MANIM_RUNTIME_DIR", DEFAULT_MANIM_RUNTIME_DIR, BASE_DIR),
     BASE_DIR,
 )
 MANIM_DEBUG_DIR = env_path(
-    "PARALLEA_MANIM_DEBUG_DIR",
-    MANIM_RUNTIME_DIR / "debug",
+    "MANIM_DEBUG_DIR",
+    env_path("PARALLEA_MANIM_DEBUG_DIR", MANIM_RUNTIME_DIR / "debug", BASE_DIR),
     BASE_DIR,
 )
 PUBLIC_DIR = env_path("PARALLEA_PUBLIC_DIR", BASE_DIR / "public", BASE_DIR)
 MANIM_PUBLIC_OUTPUT_DIR = env_path(
     "MANIM_OUTPUT_DIR",
-    env_path("PARALLEA_MANIM_OUTPUT_DIR", DEFAULT_RUNTIME_ROOT / "rendered-scenes" / "manim", BASE_DIR),
+    env_path("PARALLEA_MANIM_OUTPUT_DIR", RENDERS_DIR / "manim", BASE_DIR),
     BASE_DIR,
 )
 MANIM_PUBLIC_BASE_URL = env_str("MANIM_PUBLIC_BASE_URL", "/rendered-scenes/manim").rstrip("/") or "/rendered-scenes/manim"
@@ -174,6 +174,8 @@ STT_LANGUAGE = env_str("STT_LANGUAGE", "en").strip().lower() or "en"
 PARALLEA_DEFAULT_VOICE_ID = env_str("PARALLEA_DEFAULT_VOICE_ID", "en-US-JennyNeural")
 PARALLEA_TTS_RATE = env_str("PARALLEA_TTS_RATE", "+0%").strip() or "+0%"
 TTS_AUDIO_EXTENSION = ".mp3"
+GENERATED_MEDIA_TTL_SECONDS = max(60, env_int("GENERATED_MEDIA_TTL_SECONDS", 3600))
+DELETE_GENERATED_MEDIA_AFTER_PLAYBACK = env_bool("DELETE_GENERATED_MEDIA_AFTER_PLAYBACK", True)
 
 
 def avatar_voice_id(env_name: str, default_voice: str | None = None) -> str:

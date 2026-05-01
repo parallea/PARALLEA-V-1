@@ -27,6 +27,7 @@ from config import (
     MANIM_REQUIRE_LATEX,
     MANIM_RUNTIME_DIR,
     RENDERS_DIR,
+    TMP_DIR,
 )
 from backend.services.storage_service import (
     allow_local_fallback_for_storage_error,
@@ -34,6 +35,7 @@ from backend.services.storage_service import (
     storage_enabled,
     upload_file,
 )
+from backend.services.generated_media_cleanup import register_generated_media
 
 
 logger = logging.getLogger("parallea.manim")
@@ -66,10 +68,115 @@ OPENAI_DIRECT_SCENE_CLASS_NAME = "ParalleaGeneratedScene"
 DIRECT_SCENE_CLASS_NAMES = {DIRECT_SCENE_CLASS_NAME, OPENAI_DIRECT_SCENE_CLASS_NAME}
 TEX_DEPENDENT_CALL_RE = re.compile(r"\b(MathTex|Tex|SingleStringMathTex)\s*\(")
 TEX_DEPENDENT_NAMES = {"MathTex", "Tex", "SingleStringMathTex"}
-UNSAFE_IMPORT_ROOTS = {"os", "sys", "subprocess", "socket", "requests", "pathlib", "shutil"}
-UNSAFE_CALL_NAMES = {"open", "exec", "eval", "__import__", "input"}
+UNSAFE_IMPORT_ROOTS = {"os", "sys", "subprocess", "socket", "requests", "urllib", "http", "httpx", "pathlib", "shutil"}
+UNSAFE_CALL_NAMES = {"open", "exec", "eval", "__import__", "input", "ImageMobject", "SVGMobject"}
 COLOR_REJECT_NAMES = {"Color", "ManimColor", "rgb_to_color"}
 SAFE_COLOR_CONSTANTS = "WHITE, BLACK, BLUE, BLUE_E, GREEN, GREEN_E, RED, RED_E, YELLOW, ORANGE, PURPLE, GREY, GRAY"
+ASSET_MOBJECT_NAMES = {"ImageMobject", "SVGMobject"}
+EXTERNAL_ASSET_EXTENSIONS = (".png", ".jpg", ".jpeg", ".svg", ".gif", ".webp", ".mp4", ".mov", ".wav", ".mp3", ".json", ".txt", ".csv")
+MANIM_STDERR_TAIL_LINES = 120
+MANIM_STDOUT_TAIL_LINES = 80
+REGION_SAFE_HELPERS_CODE = '''config.frame_width = 14.222
+config.frame_height = 8.0
+config.pixel_width = 1280
+config.pixel_height = 720
+
+SAFE_MARGIN = 0.35
+FRAME_WIDTH = 14.222
+FRAME_HEIGHT = 8.0
+REGION_CENTERS = {
+    "title": UP * 3.25,
+    "left": LEFT * 3.35 + UP * 0.05,
+    "right": RIGHT * 3.25 + UP * 0.05,
+    "bottom": DOWN * 3.25,
+}
+REGION_SIZES = {
+    "title": (12.2, 0.9),
+    "left": (5.6, 5.0),
+    "right": (5.6, 5.0),
+    "bottom": (12.0, 0.75),
+}
+
+def fit_to_region(mobject, max_width, max_height):
+    if mobject.width > max_width:
+        mobject.scale_to_fit_width(max_width)
+    if mobject.height > max_height:
+        mobject.scale_to_fit_height(max_height)
+    return mobject
+
+def keep_inside_frame(mobject):
+    half_w = FRAME_WIDTH / 2 - SAFE_MARGIN
+    half_h = FRAME_HEIGHT / 2 - SAFE_MARGIN
+    if mobject.width > half_w * 2:
+        mobject.scale_to_fit_width(half_w * 2)
+    if mobject.height > half_h * 2:
+        mobject.scale_to_fit_height(half_h * 2)
+    dx = 0
+    dy = 0
+    if mobject.get_right()[0] > half_w:
+        dx -= mobject.get_right()[0] - half_w
+    if mobject.get_left()[0] < -half_w:
+        dx += -half_w - mobject.get_left()[0]
+    if mobject.get_top()[1] > half_h:
+        dy -= mobject.get_top()[1] - half_h
+    if mobject.get_bottom()[1] < -half_h:
+        dy += -half_h - mobject.get_bottom()[1]
+    if dx or dy:
+        mobject.shift(RIGHT * dx + UP * dy)
+    return mobject
+
+def safe_text(text, font_size=32, max_width=5.5):
+    mobject = Text(str(text or ""), font_size=min(int(font_size), 48), color=WHITE)
+    fit_to_region(mobject, max_width, 1.0)
+    return mobject
+
+def bullet_list(items, max_width=5.5, font_size=28):
+    rows = VGroup()
+    for item in list(items or [])[:5]:
+        row = safe_text("- " + str(item), font_size=font_size, max_width=max_width)
+        rows.add(row)
+    if len(rows):
+        rows.arrange(DOWN, aligned_edge=LEFT, buff=0.18)
+    fit_to_region(rows, max_width, 4.7)
+    return rows
+
+def _place_region(mobject, region_name):
+    max_width, max_height = REGION_SIZES[region_name]
+    fit_to_region(mobject, max_width, max_height)
+    mobject.move_to(REGION_CENTERS[region_name])
+    keep_inside_frame(mobject)
+    return mobject
+
+def place_title(mobject):
+    return _place_region(mobject, "title")
+
+def place_left(mobject):
+    return _place_region(mobject, "left")
+
+def place_right(mobject):
+    return _place_region(mobject, "right")
+
+def place_bottom(mobject):
+    return _place_region(mobject, "bottom")
+
+def clear_region(scene, active_regions, region_name):
+    old_mobject = active_regions.get(region_name)
+    if old_mobject is not None:
+        scene.play(FadeOut(old_mobject), run_time=0.4)
+        active_regions[region_name] = None
+
+def replace_region(scene, active_regions, region_name, new_mobject, animation=FadeIn):
+    clear_region(scene, active_regions, region_name)
+    scene.play(animation(new_mobject), run_time=0.6)
+    active_regions[region_name] = new_mobject
+    return new_mobject
+
+def clear_all_regions(scene, active_regions, keep_title=False):
+    for region_name in list(active_regions.keys()):
+        if keep_title and region_name == "title":
+            continue
+        clear_region(scene, active_regions, region_name)
+'''
 
 for path in [MANIM_DIR, MANIM_SCENES_DIR, MANIM_WORK_DIR, MANIM_OUTPUT_DIR, MANIM_LOG_DIR, MANIM_HEALTH_DIR]:
     path.mkdir(parents=True, exist_ok=True)
@@ -201,7 +308,15 @@ def _manim_object_key(payload: dict[str, Any] | None, segment_id: str, key: str)
     session_id = data.get("storage_session_id") or data.get("session_id") or segment_id or "session"
     message_id = data.get("storage_message_id") or data.get("message_id") or "message"
     render_id = data.get("storage_render_id") or data.get("render_id") or key
-    return safe_object_key("manim-renders", session_id, message_id, f"{render_id}.mp4")
+    return safe_object_key("temp", "manim-renders", session_id, message_id, f"{render_id}.mp4")
+
+
+def _manim_temp_local_path(payload: dict[str, Any] | None, segment_id: str, key: str) -> Path:
+    data = payload or {}
+    session_id = safe_object_key(data.get("storage_session_id") or data.get("session_id") or segment_id or "session")
+    message_id = safe_object_key(data.get("storage_message_id") or data.get("message_id") or "message")
+    render_id = safe_object_key(data.get("storage_render_id") or data.get("render_id") or key)
+    return TMP_DIR / "manim-renders" / session_id / message_id / f"{render_id}.mp4"
 
 
 def _publish_manim_video(
@@ -211,11 +326,30 @@ def _publish_manim_video(
     segment_id: str,
     key: str,
 ) -> tuple[str, dict[str, Any] | None]:
+    data = payload or {}
+    session_id = str(data.get("storage_session_id") or data.get("session_id") or segment_id or "")
+    message_id = str(data.get("storage_message_id") or data.get("message_id") or "")
+    size_bytes = final_video.stat().st_size if final_video.exists() else None
     if not storage_enabled():
-        cache_bust = int(final_video.stat().st_mtime) if final_video.exists() else 0
-        media_url_no_bust = path_to_public_url(final_video)
-        media_url = f"{media_url_no_bust}?v={cache_bust}" if cache_bust else media_url_no_bust
-        return media_url, None
+        temp_path = _manim_temp_local_path(payload, segment_id, key)
+        temp_path.parent.mkdir(parents=True, exist_ok=True)
+        if final_video.resolve() != temp_path.resolve():
+            shutil.move(str(final_video), str(temp_path))
+        record = register_generated_media(
+            session_id=session_id,
+            message_id=message_id,
+            media_type="manim_video",
+            storage_backend="local",
+            local_path=temp_path,
+            content_type="video/mp4",
+            size_bytes=size_bytes,
+        )
+        return str(record.get("url") or ""), {
+            "backend": "local",
+            "object_key": None,
+            "generated_media": record,
+            "local_path": str(temp_path),
+        }
     object_key = _manim_object_key(payload, segment_id, key)
     try:
         stored = upload_file(
@@ -225,7 +359,19 @@ def _publish_manim_video(
             metadata={"kind": "manim_render", "segment_id": segment_id, "render_key": key},
         )
         final_video.unlink(missing_ok=True)
-        return stored.url or "", stored.to_dict()
+        record = register_generated_media(
+            session_id=session_id,
+            message_id=message_id,
+            media_type="manim_video",
+            storage_backend="s3",
+            object_key=stored.object_key,
+            url=stored.url,
+            content_type=stored.content_type,
+            size_bytes=stored.size_bytes,
+        )
+        stored_dict = stored.to_dict()
+        stored_dict["generated_media"] = record
+        return stored.url or "", stored_dict
     except Exception as exc:  # noqa: BLE001
         logger.exception("manim storage upload failed key=%s object_key=%s: %s", key, object_key, exc)
         if allow_local_fallback_for_storage_error():
@@ -276,6 +422,49 @@ def _import_root(name: str | None) -> str:
     return (name or "").split(".", 1)[0]
 
 
+def _looks_like_external_asset(value: Any) -> bool:
+    text = str(value or "").strip().lower()
+    if not text:
+        return False
+    if "://" in text:
+        return True
+    normalized = text.replace("\\", "/")
+    return any(normalized.endswith(ext) or f"{ext}?" in normalized for ext in EXTERNAL_ASSET_EXTENSIONS)
+
+
+def _risky_layout_error(text: str) -> str | None:
+    if not re.search(r"active_regions\s*=\s*\{", text) or "replace_region(self" not in text:
+        return "layout risk: generated scene must use active_regions and replace_region for region-safe replacement"
+    for match in re.finditer(r"\.shift\s*\(\s*(UP|DOWN|LEFT|RIGHT)\s*\*\s*([0-9]+(?:\.[0-9]+)?)", text):
+        direction = match.group(1)
+        amount = float(match.group(2))
+        limit = 3.4 if direction in {"UP", "DOWN"} else 6.0
+        if amount >= limit:
+            return f"layout risk: extreme {direction} shift {amount} can crop the frame"
+    for match in re.finditer(r"\.shift\s*\(\s*([0-9]+(?:\.[0-9]+)?)\s*\*\s*(UP|DOWN|LEFT|RIGHT)", text):
+        amount = float(match.group(1))
+        direction = match.group(2)
+        limit = 3.4 if direction in {"UP", "DOWN"} else 6.0
+        if amount >= limit:
+            return f"layout risk: extreme {direction} shift {amount} can crop the frame"
+    for match in re.finditer(r"\.to_edge\s*\(([^)]*)\)", text):
+        args = match.group(1)
+        if "buff" not in args:
+            return "layout risk: to_edge must use buff >= 0.3 or region placement helpers"
+        buff_match = re.search(r"buff\s*=\s*([0-9]+(?:\.[0-9]+)?)", args)
+        if buff_match and float(buff_match.group(1)) < 0.3:
+            return "layout risk: to_edge buff must be at least 0.3"
+    for match in re.finditer(r"font_size\s*=\s*([0-9]+)", text):
+        if int(match.group(1)) > 52:
+            return f"layout risk: font_size {match.group(1)} is too large for safe 16:9 layout"
+    text_call_count = len(re.findall(r"\b(?:Text|MarkupText|MathTex|Tex)\s*\(", text))
+    if text_call_count and not any(token in text for token in ("safe_text(", "fit_to_region(", "scale_to_fit_width")):
+        return "layout risk: Text/MathTex objects must be created with safe_text or fitted to a region"
+    if text_call_count > 12 and "bullet_list(" not in text:
+        return "layout risk: too many text objects without grouping into bullet_list or region groups"
+    return None
+
+
 def latex_render_failure(stdout: str, stderr: str, scene_source: str) -> bool:
     haystack = f"{stdout}\n{stderr}\n{scene_source}".lower()
     if "tex_file_writing.py" in haystack or "mathtex" in haystack or "singlestringmathtex" in haystack:
@@ -308,6 +497,9 @@ def direct_manim_validation_error(code: str, *, scene_class_name: str = DIRECT_S
     for token in banned_color_tokens:
         if token in lowered:
             return f"unsupported color construct: {token}"
+    for asset_name in ASSET_MOBJECT_NAMES:
+        if re.search(rf"\b{asset_name}\s*\(", text):
+            return f"external assets are not allowed: {asset_name}"
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -342,12 +534,22 @@ def direct_manim_validation_error(code: str, *, scene_class_name: str = DIRECT_S
                 return f"unsafe reference: {node.value.id}.{node.attr}"
             if node.attr in COLOR_REJECT_NAMES:
                 return f"unsupported color construct: {node.attr}"
+            if node.attr in ASSET_MOBJECT_NAMES:
+                return f"external assets are not allowed: {node.attr}"
         elif isinstance(node, ast.Name):
             if node.id in UNSAFE_IMPORT_ROOTS:
                 return f"unsafe reference: {node.id}"
+            if node.id in ASSET_MOBJECT_NAMES:
+                return f"external assets are not allowed: {node.id}"
+        elif isinstance(node, ast.Constant):
+            if isinstance(node.value, str) and _looks_like_external_asset(node.value):
+                return "external file paths, URLs, and assets are not allowed in generated Manim code"
 
     if not has_manim_star_import:
         return "missing `from manim import *`"
+    layout_error = _risky_layout_error(text)
+    if layout_error:
+        return layout_error
     return None
 
 
@@ -370,40 +572,35 @@ def fallback_direct_manim_code(
     bullets_literal = "[" + ", ".join(bullets) + "]"
     return f'''from manim import *
 
+{REGION_SAFE_HELPERS_CODE}
+
 class {scene_class_name}(Scene):
     def construct(self):
         self.camera.background_color = BLACK
-        title = Text({title}, font_size=38, color=WHITE)
-        title.scale_to_fit_width(10.6)
-        title.to_edge(UP, buff=0.45)
+        active_regions = {{"title": None, "left": None, "right": None, "bottom": None}}
+        title = safe_text({title}, font_size=36, max_width=12.0)
+        place_title(title)
+        replace_region(self, active_regions, "title", title)
 
         bullets = {bullets_literal}
-        rows = VGroup()
-        for index, item in enumerate(bullets, start=1):
-            dot = Dot(radius=0.06, color=BLUE)
-            text = Text(str(index) + ". " + str(item), font_size=25, color=WHITE)
-            text.scale_to_fit_width(8.7)
-            rows.add(VGroup(dot, text).arrange(RIGHT, buff=0.2, aligned_edge=UP))
-        rows.arrange(DOWN, aligned_edge=LEFT, buff=0.28)
-        panel = Rectangle(width=10.4, height=4.2, color=BLUE, stroke_width=2.5)
-        rows.move_to(panel.get_center())
+        rows = bullet_list(bullets, max_width=5.2, font_size=25)
+        place_left(rows)
+        replace_region(self, active_regions, "left", rows)
 
         left = Circle(radius=0.36, color=GREEN)
         middle = Rectangle(width=1.35, height=0.66, color=YELLOW)
         right = Circle(radius=0.36, color=ORANGE)
-        diagram = VGroup(left, middle, right).arrange(RIGHT, buff=0.7)
-        diagram.next_to(panel, DOWN, buff=0.35)
+        flow = VGroup(left, middle, right).arrange(RIGHT, buff=0.7)
         arrows = VGroup(
             Arrow(left.get_right(), middle.get_left(), buff=0.12, color=BLUE),
             Arrow(middle.get_right(), right.get_left(), buff=0.12, color=BLUE),
         )
-        follow = Text("Does that make sense now?", font_size=24, color=YELLOW)
-        follow.next_to(diagram, DOWN, buff=0.22)
-
-        self.play(Write(title), run_time=0.7)
-        self.play(Create(panel), Write(rows), run_time=1.0)
-        self.play(FadeIn(diagram), Create(arrows), run_time=0.8)
-        self.play(FadeIn(follow, shift=UP * 0.08), run_time=0.4)
+        diagram = VGroup(flow, arrows)
+        place_right(diagram)
+        replace_region(self, active_regions, "right", diagram)
+        follow = safe_text("Does that make sense now?", font_size=24, max_width=11.5)
+        place_bottom(follow)
+        replace_region(self, active_regions, "bottom", follow)
         self.wait(2)
 '''
 
@@ -535,6 +732,16 @@ def log_manim_runtime_status() -> dict[str, Any]:
         info.get("runtime_directories_writable"),
         MANIM_RUNTIME_DIR,
         info.get("manim_allow_mathtex_effective"),
+    )
+    logger.info(
+        "manim-runtime dirs runtime=%s scenes=%s work=%s debug_logs=%s health=%s output=%s writable=%s",
+        MANIM_RUNTIME_DIR,
+        MANIM_SCENES_DIR,
+        MANIM_WORK_DIR,
+        MANIM_LOG_DIR,
+        MANIM_HEALTH_DIR,
+        MANIM_OUTPUT_DIR,
+        info.get("runtime_directories_writable"),
     )
     if not info.get("ffmpeg_available"):
         logger.error("manim-runtime ffmpeg was not found in PATH")
@@ -1027,6 +1234,11 @@ def build_scene_source(scene_name: str, payload: dict[str, Any]) -> str:
 import json
 import numpy as np
 
+config.frame_width = 14.222
+config.frame_height = 8.0
+config.pixel_width = 1280
+config.pixel_height = 720
+
 PAYLOAD = json.loads({payload_literal!r})
 LATEX_AVAILABLE = {latex_available_literal}
 BG = "#0a0e13"
@@ -1396,6 +1608,121 @@ def debug_bundle_dir(key: str) -> Path:
     return path
 
 
+def tail_lines(text: Any, line_count: int) -> str:
+    lines = str(text or "").splitlines()
+    return "\n".join(lines[-line_count:]) if lines else ""
+
+
+def read_log_tail(path_text: str | Path | None, line_count: int) -> str:
+    if not path_text:
+        return ""
+    try:
+        path = Path(path_text)
+        if path.exists():
+            return tail_lines(path.read_text(encoding="utf-8", errors="replace"), line_count)
+    except Exception:
+        return ""
+    return ""
+
+
+def manim_failure_stage(payload: dict[str, Any] | None) -> str:
+    data = payload or {}
+    if data.get("_render_fallback_retry") or data.get("fallback_attempted") or data.get("render_failure_stage") == "fallback":
+        return "fallback"
+    source = clean_spaces(data.get("manim_code_source")).lower()
+    if data.get("repair_attempted") or data.get("repair_used") or "repair" in source:
+        return "repaired"
+    return "generated"
+
+
+def repair_was_attempted(payload: dict[str, Any] | None) -> bool:
+    data = payload or {}
+    source = clean_spaces(data.get("manim_code_source")).lower()
+    return bool(data.get("repair_attempted") or data.get("repair_used") or "repair" in source)
+
+
+def fallback_was_attempted(payload: dict[str, Any] | None) -> bool:
+    data = payload or {}
+    return bool(data.get("_render_fallback_retry") or data.get("fallback_attempted") or data.get("_fallback_will_run") or data.get("render_failure_stage") == "fallback")
+
+
+def summarize_manim_error(stderr: Any, stdout: Any, fallback: str = "") -> str:
+    combined = "\n".join([str(stderr or ""), str(stdout or "")])
+    lines = [line.strip() for line in combined.splitlines() if line.strip()]
+    priority_tokens = (
+        "traceback",
+        "exception",
+        "error",
+        "typeerror",
+        "valueerror",
+        "attributeerror",
+        "nameerror",
+        "indexerror",
+        "runtimeerror",
+        "modulenotfounderror",
+    )
+    for line in reversed(lines):
+        lowered = line.lower()
+        if any(token in lowered for token in priority_tokens):
+            return line[-900:]
+    if lines:
+        return lines[-1][-900:]
+    return clean_spaces(fallback)[-900:]
+
+
+def log_manim_failure(
+    *,
+    key: str,
+    segment_id: str,
+    frame_number: int | None,
+    scene_file: Path,
+    command_text: str,
+    return_code: int | str | None,
+    payload: dict[str, Any] | None,
+    debug_paths: dict[str, str],
+    error_summary: str,
+    fallback_will_run: bool = False,
+) -> None:
+    stderr_tail = read_log_tail(debug_paths.get("stderr_path"), MANIM_STDERR_TAIL_LINES)
+    stdout_tail = read_log_tail(debug_paths.get("stdout_path"), MANIM_STDOUT_TAIL_LINES)
+    fallback_attempted = fallback_was_attempted(payload) or fallback_will_run
+    logger.error(
+        "[manim] render failed stage=%s segment=%s frame=%s render_id=%s return_code=%s repair_attempted=%s fallback_attempted=%s scene_file=%s scene_code_path=%s command=%s stderr_log=%s stdout_log=%s debug_meta=%s error_summary=%s",
+        manim_failure_stage(payload),
+        segment_id,
+        frame_number,
+        key,
+        return_code,
+        repair_was_attempted(payload),
+        fallback_attempted,
+        scene_file,
+        scene_file,
+        command_text,
+        debug_paths.get("stderr_path"),
+        debug_paths.get("stdout_path"),
+        debug_paths.get("meta_path"),
+        error_summary,
+    )
+    if stderr_tail:
+        logger.error(
+            "[manim] stderr tail stage=%s segment=%s frame=%s last_lines=%s\n%s",
+            manim_failure_stage(payload),
+            segment_id,
+            frame_number,
+            MANIM_STDERR_TAIL_LINES,
+            stderr_tail,
+        )
+    if stdout_tail:
+        logger.error(
+            "[manim] stdout tail stage=%s segment=%s frame=%s last_lines=%s\n%s",
+            manim_failure_stage(payload),
+            segment_id,
+            frame_number,
+            MANIM_STDOUT_TAIL_LINES,
+            stdout_tail,
+        )
+
+
 def persist_debug_artifacts(
     *,
     key: str,
@@ -1408,13 +1735,27 @@ def persist_debug_artifacts(
     stderr: str,
     status: str,
     output_path: Path | None = None,
+    return_code: int | str | None = None,
+    error_summary: str = "",
 ) -> dict[str, str]:
     bundle_dir = debug_bundle_dir(key)
+    stdout_path = bundle_dir / "stdout.log"
+    stderr_path = bundle_dir / "stderr.log"
+    command_path = bundle_dir / "command.txt"
     meta = {
         "status": status,
+        "render_id": key,
+        "failure_stage": manim_failure_stage(payload),
+        "error_summary": error_summary or summarize_manim_error(stderr, stdout, status),
+        "return_code": return_code,
+        "repair_attempted": repair_was_attempted(payload),
+        "fallback_attempted": fallback_was_attempted(payload),
         "segment_id": segment_id,
         "frame_number": frame_number,
         "scene_file": str(scene_file),
+        "scene_code_path": str(scene_file),
+        "stdout_log": str(stdout_path),
+        "stderr_log": str(stderr_path),
         "command": command,
         "command_string": command_to_string(command),
         "python_executable": str(resolve_manim_python()),
@@ -1423,9 +1764,6 @@ def persist_debug_artifacts(
         "payload": payload,
     }
     meta_path = bundle_dir / "meta.json"
-    stdout_path = bundle_dir / "stdout.log"
-    stderr_path = bundle_dir / "stderr.log"
-    command_path = bundle_dir / "command.txt"
     write_text_file(meta_path, json.dumps(meta, indent=2, ensure_ascii=False))
     write_text_file(command_path, command_to_string(command))
     write_text_file(stdout_path, stdout or "")
@@ -1446,13 +1784,8 @@ def final_manim_video_path(key: str, output_name: str) -> Path:
 
 
 def public_artifact_paths(final_video: Path, key: str) -> tuple[Path, Path, Path]:
-    if final_video.name == "scene.mp4":
-        return final_video.parent / "scene.py", final_video.parent / "render.log", final_video.parent / "metadata.json"
-    return (
-        final_video.with_suffix(".py"),
-        final_video.with_suffix(".render.log"),
-        final_video.with_suffix(".metadata.json"),
-    )
+    bundle_dir = debug_bundle_dir(key)
+    return bundle_dir / "scene.py", bundle_dir / "render.log", bundle_dir / "metadata.json"
 
 
 def render_fallback_allowed(payload: dict[str, Any] | None) -> bool:
@@ -1466,6 +1799,8 @@ def fallback_render_payload(payload: dict[str, Any] | None, error: str) -> dict[
     return {
         **(payload or {}),
         "_render_fallback_retry": True,
+        "fallback_attempted": True,
+        "render_failure_stage": "fallback",
         "manim_code_validation": validation,
         "render_fallback_reason": error,
     }
@@ -1507,27 +1842,39 @@ def run_manim_scene(
     try:
         validate_scene_source(scene_source, scene_file)
     except Exception as exc:
+        artifact_payload = {**(payload or {}), "_fallback_will_run": render_fallback_allowed(payload)}
         debug_paths = persist_debug_artifacts(
             key=key,
             segment_id=segment_id,
             frame_number=frame_number,
             scene_file=scene_file,
             command=[],
-            payload=payload,
+            payload=artifact_payload,
             stdout="",
             stderr=str(exc),
             status="scene-compile-failed",
             output_path=None,
+            return_code="compile",
+            error_summary=str(exc),
         )
-        logger.error(
-            "manim-scene validation failed segment=%s frame=%s scene=%s debug_meta=%s error=%s",
-            segment_id,
-            frame_number,
-            scene_file,
-            debug_paths["meta_path"],
-            exc,
+        log_manim_failure(
+            key=key,
+            segment_id=segment_id,
+            frame_number=frame_number,
+            scene_file=scene_file,
+            command_text="",
+            return_code="compile",
+            payload=artifact_payload,
+            debug_paths=debug_paths,
+            error_summary=str(exc),
+            fallback_will_run=render_fallback_allowed(payload),
         )
-        raise
+        raise RuntimeError(
+            "Manim scene compile failed for "
+            f"segment={segment_id} frame={frame_number} scene_file={scene_file} "
+            f"render_id={key} failure_stage={manim_failure_stage(payload)} return_code=compile "
+            f"error_summary={exc} stderr_log={debug_paths['stderr_path']} stdout_log={debug_paths['stdout_path']} debug_meta={debug_paths['meta_path']}"
+        ) from exc
 
     command = [
         str(python_exec),
@@ -1572,29 +1919,35 @@ def run_manim_scene(
         render_time_sec = round(time.perf_counter() - render_started, 3)
         stdout = exc.stdout or ""
         stderr = exc.stderr or ""
+        error = f"Generated Manim render timed out after {MANIM_RENDER_TIMEOUT_SEC} seconds."
+        artifact_payload = {**(payload or {}), "_fallback_will_run": render_fallback_allowed(payload)}
         debug_paths = persist_debug_artifacts(
             key=key,
             segment_id=segment_id,
             frame_number=frame_number,
             scene_file=scene_file,
             command=command,
-            payload=payload,
+            payload=artifact_payload,
             stdout=stdout,
             stderr=stderr,
             status="timeout",
             output_path=None,
+            return_code="timeout",
+            error_summary=error,
         )
-        logger.error(
-            "manim-render timeout segment=%s frame=%s scene=%s timeout_sec=%s elapsed_sec=%s stderr_log=%s",
-            segment_id,
-            frame_number,
-            scene_file,
-            MANIM_RENDER_TIMEOUT_SEC,
-            render_time_sec,
-            debug_paths["stderr_path"],
+        log_manim_failure(
+            key=key,
+            segment_id=segment_id,
+            frame_number=frame_number,
+            scene_file=scene_file,
+            command_text=command_text,
+            return_code="timeout",
+            payload=artifact_payload,
+            debug_paths=debug_paths,
+            error_summary=f"{error} elapsed_sec={render_time_sec}",
+            fallback_will_run=render_fallback_allowed(payload),
         )
         if render_fallback_allowed(payload):
-            error = f"Generated Manim render timed out after {MANIM_RENDER_TIMEOUT_SEC} seconds."
             logger.warning("[manim] generated-code failure: %s; rendering fallback scene segment=%s frame=%s", error, segment_id, frame_number)
             fallback_payload = fallback_render_payload(payload, error)
             return run_manim_scene(
@@ -1611,22 +1964,29 @@ def run_manim_scene(
         raise RuntimeError(
             "Manim render timed out for "
             f"segment={segment_id} frame={frame_number} scene_file={scene_file} "
-            f"command={command_text} stderr_log={debug_paths['stderr_path']}"
+            f"render_id={key} failure_stage={manim_failure_stage(payload)} return_code=timeout "
+            f"error_summary={error} command={command_text} "
+            f"stderr_log={debug_paths['stderr_path']} stdout_log={debug_paths['stdout_path']} debug_meta={debug_paths['meta_path']}"
         ) from exc
 
     render_time_sec = round(time.perf_counter() - render_started, 3)
     rendered = locate_rendered_video(work_dir, output_name) if result.returncode == 0 else None
+    render_status = "ok" if result.returncode == 0 and rendered else "failed"
+    render_error_summary = "" if render_status == "ok" else summarize_manim_error(result.stderr or "", result.stdout or "", f"return code {result.returncode}")
+    artifact_payload = {**(payload or {}), "_fallback_will_run": render_status != "ok" and render_fallback_allowed(payload)}
     debug_paths = persist_debug_artifacts(
         key=key,
         segment_id=segment_id,
         frame_number=frame_number,
         scene_file=scene_file,
         command=command,
-        payload=payload,
+        payload=artifact_payload,
         stdout=result.stdout or "",
         stderr=result.stderr or "",
-        status="ok" if result.returncode == 0 and rendered else "failed",
+        status=render_status,
         output_path=rendered,
+        return_code=result.returncode,
+        error_summary=render_error_summary,
     )
 
     if result.returncode != 0:
@@ -1637,13 +1997,20 @@ def run_manim_scene(
                 if latex_failed
                 else f"Generated Manim render failed with return code {result.returncode}."
             )
-            logger.warning(
-                "[manim] generated-code failure: %s segment=%s frame=%s stderr_log=%s",
-                error,
-                segment_id,
-                frame_number,
-                debug_paths["stderr_path"],
+            error_summary = summarize_manim_error(result.stderr or "", result.stdout or "", error)
+            log_manim_failure(
+                key=key,
+                segment_id=segment_id,
+                frame_number=frame_number,
+                scene_file=scene_file,
+                command_text=command_text,
+                return_code=result.returncode,
+                payload=artifact_payload,
+                debug_paths=debug_paths,
+                error_summary=error_summary,
+                fallback_will_run=True,
             )
+            logger.warning("[manim] generated-code failure: %s; rendering fallback scene segment=%s frame=%s", error, segment_id, frame_number)
             fallback_payload = fallback_render_payload(payload, error)
             return run_manim_scene(
                 key=key,
@@ -1656,35 +2023,57 @@ def run_manim_scene(
                 payload=fallback_payload,
                 work_dir=work_dir,
             )
-        logger.error(
-            "[manim] render failed segment=%s frame=%s scene=%s command=%s stderr_log=%s",
-            segment_id,
-            frame_number,
-            scene_file,
-            command_text,
-            debug_paths["stderr_path"],
+        error_summary = summarize_manim_error(result.stderr or "", result.stdout or "", f"return code {result.returncode}")
+        log_manim_failure(
+            key=key,
+            segment_id=segment_id,
+            frame_number=frame_number,
+            scene_file=scene_file,
+            command_text=command_text,
+            return_code=result.returncode,
+            payload=artifact_payload,
+            debug_paths=debug_paths,
+            error_summary=error_summary,
+            fallback_will_run=False,
         )
-        if result.stderr:
-            logger.error("manim-render stderr segment=%s frame=%s\n%s", segment_id, frame_number, result.stderr)
-        if result.stdout:
-            logger.error("manim-render stdout segment=%s frame=%s\n%s", segment_id, frame_number, result.stdout)
         raise RuntimeError(
             "Manim render failed for "
             f"segment={segment_id} frame={frame_number} scene_file={scene_file} "
-            f"command={command_text} stderr_log={debug_paths['stderr_path']}"
+            f"render_id={key} failure_stage={manim_failure_stage(payload)} return_code={result.returncode} "
+            f"error_summary={error_summary} command={command_text} "
+            f"stderr_log={debug_paths['stderr_path']} stdout_log={debug_paths['stdout_path']} debug_meta={debug_paths['meta_path']}"
         )
 
     if rendered is None or not rendered.exists():
-        logger.error(
-            "manim-render missing-output segment=%s frame=%s scene=%s command=%s debug=%s",
-            segment_id,
-            frame_number,
-            scene_file,
-            command_text,
-            debug_paths["meta_path"],
+        error = "Manim completed without producing an mp4 output."
+        missing_output_payload = {**(payload or {}), "_fallback_will_run": render_fallback_allowed(payload)}
+        debug_paths = persist_debug_artifacts(
+            key=key,
+            segment_id=segment_id,
+            frame_number=frame_number,
+            scene_file=scene_file,
+            command=command,
+            payload=missing_output_payload,
+            stdout=result.stdout or "",
+            stderr=result.stderr or "",
+            status="missing-output",
+            output_path=None,
+            return_code=result.returncode,
+            error_summary=error,
+        )
+        log_manim_failure(
+            key=key,
+            segment_id=segment_id,
+            frame_number=frame_number,
+            scene_file=scene_file,
+            command_text=command_text,
+            return_code=result.returncode,
+            payload=missing_output_payload,
+            debug_paths=debug_paths,
+            error_summary=error,
+            fallback_will_run=render_fallback_allowed(payload),
         )
         if render_fallback_allowed(payload):
-            error = "Manim completed without producing an mp4 output."
             logger.warning("[manim] generated-code failure: %s; rendering fallback scene segment=%s frame=%s", error, segment_id, frame_number)
             fallback_payload = fallback_render_payload(payload, error)
             return run_manim_scene(
@@ -1700,7 +2089,9 @@ def run_manim_scene(
             )
         raise RuntimeError(
             "Manim render completed without producing an mp4 output for "
-            f"segment={segment_id} frame={frame_number} scene_file={scene_file} debug_meta={debug_paths['meta_path']}"
+            f"segment={segment_id} frame={frame_number} scene_file={scene_file} "
+            f"render_id={key} failure_stage={manim_failure_stage(payload)} error_summary={error} "
+            f"command={command_text} stderr_log={debug_paths['stderr_path']} stdout_log={debug_paths['stdout_path']} debug_meta={debug_paths['meta_path']}"
         )
 
     final_video.parent.mkdir(parents=True, exist_ok=True)
@@ -1741,6 +2132,10 @@ def run_manim_scene(
                 "storage": stored_object,
                 "latex_available": has_latex_available(),
                 "text_only_mode": manim_text_only_mode(),
+                "layout_mode": (payload or {}).get("layout_mode"),
+                "region_replacement_used": bool((payload or {}).get("region_replacement_used")),
+                "visual_complexity": (payload or {}).get("visual_complexity"),
+                "repair_used": bool((payload or {}).get("repair_used")),
             },
             indent=2,
             ensure_ascii=False,
@@ -1772,6 +2167,10 @@ def run_manim_scene(
         "used_fallback": used_fallback,
         "storage": stored_object,
         "payload": payload,
+        "layout_mode": (payload or {}).get("layout_mode"),
+        "region_replacement_used": bool((payload or {}).get("region_replacement_used")),
+        "visual_complexity": (payload or {}).get("visual_complexity"),
+        "repair_used": bool((payload or {}).get("repair_used")),
     }
 
 
@@ -1822,6 +2221,10 @@ def render_manim_payload(
             "render_time_sec": 0.0,
             "payload": payload,
             "validation": validation,
+            "layout_mode": payload.get("layout_mode"),
+            "region_replacement_used": bool(payload.get("region_replacement_used")),
+            "visual_complexity": payload.get("visual_complexity"),
+            "repair_used": bool(payload.get("repair_used")),
         }
 
     return run_manim_scene(

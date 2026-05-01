@@ -88,6 +88,7 @@ from backend.auth.admin import log_admin_auth_status  # noqa: E402
 from backend.auth.oauth import register_oauth_state_middleware  # noqa: E402
 from backend.admin import admin_router  # noqa: E402
 from backend.services.supabase_analytics import log_supabase_analytics_status  # noqa: E402
+from backend.services.generated_media_cleanup import cleanup_expired_generated_media, get_active_generated_media  # noqa: E402
 from backend.services.storage_service import LOCAL_STORAGE_DIR, log_storage_status, storage_status, url_for_object  # noqa: E402
 from backend.store import videos_repo as teacher_videos_repo  # noqa: E402
 from backend.teacher import teacher_router  # noqa: E402
@@ -429,6 +430,10 @@ def cached_avatar_audio_url(kind: str, avatar: dict) -> str | None:
     path = AUDIO_DIR / filename
     if path.exists() and path.stat().st_size > 0:
         return f"/audio-response/{filename}"
+    safe_key = filename.rsplit(".", 1)[0]
+    cached = get_active_generated_media("cached", safe_key, "audio")
+    if cached and cached.get("url"):
+        return str(cached["url"])
     return None
 
 def remove_cached_lesson_audio(video_id: str) -> list[str]:
@@ -1610,6 +1615,15 @@ async def prepare_streaming_segment_item(
         "visual_segment": visual_segment,
     }
 
+
+async def generated_media_cleanup_loop() -> None:
+    while True:
+        await asyncio.sleep(20 * 60)
+        try:
+            cleanup_expired_generated_media()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("generated media periodic cleanup failed: %s", exc)
+
 @app.on_event("startup")
 async def startup():
     ensure_dirs()
@@ -1629,6 +1643,8 @@ async def startup():
     log_supabase_analytics_status()
     log_storage_status()
     manim_info = log_manim_runtime_status()
+    cleanup_expired_generated_media()
+    asyncio.create_task(generated_media_cleanup_loop())
     diag = tts_diagnostics()
     if diag["configured"]:
         print("TTS configuration ready")

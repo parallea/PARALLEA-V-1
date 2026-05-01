@@ -91,6 +91,41 @@ def endpoint_host() -> str:
     return parsed.netloc or parsed.path
 
 
+def _url_host(raw_url: str) -> str:
+    parsed = urlparse((raw_url or "").strip())
+    return (parsed.netloc or parsed.path).lower()
+
+
+def _looks_like_backblaze_s3_api_url(raw_url: str) -> bool:
+    host = _url_host(raw_url)
+    return bool(
+        host == "s3.backblazeb2.com"
+        or re.match(r"^s3\.[a-z0-9-]+\.backblazeb2\.com$", host)
+        or re.match(r"^[^.]+\.s3\.[a-z0-9-]+\.backblazeb2\.com$", host)
+    )
+
+
+def _effective_public_base_url() -> str:
+    public_base = (S3_PUBLIC_BASE_URL or "").strip().rstrip("/")
+    if not public_base or not storage_enabled():
+        return ""
+    if get_storage_provider() == "backblaze" or _looks_like_backblaze_s3_api_url(S3_ENDPOINT_URL):
+        logger.warning(
+            "storage public base URL ignored for Backblaze private bucket; presigned URLs will be used provider=%s endpoint_host=%s public_base_host=%s",
+            get_storage_provider(),
+            endpoint_host(),
+            _url_host(public_base),
+        )
+        return ""
+    if endpoint_host() and _url_host(public_base) == endpoint_host().lower():
+        logger.warning(
+            "storage public base URL matches S3 endpoint host; refusing to return plain private-object URLs host=%s",
+            endpoint_host(),
+        )
+        return ""
+    return public_base
+
+
 def _s3_configured() -> bool:
     return bool(S3_BUCKET_NAME and S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY)
 
@@ -174,9 +209,10 @@ def _local_path(object_key: str) -> Path:
 def get_public_url(object_key: str) -> str | None:
     key = safe_object_key(*str(object_key).split("/"))
     if storage_enabled():
-        if not S3_PUBLIC_BASE_URL:
+        public_base = _effective_public_base_url()
+        if not public_base:
             return None
-        return f"{S3_PUBLIC_BASE_URL.rstrip('/')}/{key}"
+        return f"{public_base}/{key}"
     return f"/storage/{key}"
 
 
@@ -321,6 +357,7 @@ def can_create_presigned_url() -> bool:
 
 def storage_status() -> dict[str, Any]:
     validation_errors = _s3_validation_errors() if storage_enabled() else []
+    effective_public_base_url = _effective_public_base_url()
     return {
         "backend": get_storage_backend(),
         "provider": get_storage_provider(),
@@ -330,7 +367,9 @@ def storage_status() -> dict[str, Any]:
         "endpoint_host": endpoint_host(),
         "region": S3_REGION,
         "public_base_url_configured": bool(S3_PUBLIC_BASE_URL),
-        "presigned_urls_enabled": storage_enabled() and not bool(S3_PUBLIC_BASE_URL),
+        "public_base_url_effective": bool(effective_public_base_url),
+        "private_presigned_mode": storage_enabled() and not bool(effective_public_base_url),
+        "presigned_urls_enabled": storage_enabled() and not bool(effective_public_base_url),
         "temp_dir": str(TMP_DIR),
         "temp_dir_writable": temp_dir_writable(),
         "manim_runtime_dir": str(MANIM_RUNTIME_DIR),
@@ -343,13 +382,15 @@ def storage_status() -> dict[str, Any]:
 def log_storage_status() -> dict[str, Any]:
     status = storage_status()
     logger.info(
-        "storage backend=%s provider=%s bucket_configured=%s endpoint_host=%s region=%s public_base_url_configured=%s tmp_dir=%s tmp_writable=%s manim_runtime_dir=%s manim_runtime_writable=%s local_static_routes=%s",
+        "storage backend=%s provider=%s bucket_configured=%s endpoint_host=%s region=%s public_base_url_configured=%s public_base_url_effective=%s presigned_urls_enabled=%s tmp_dir=%s tmp_writable=%s manim_runtime_dir=%s manim_runtime_writable=%s local_static_routes=%s",
         status["backend"],
         status["provider"],
         status["bucket_configured"],
         status["endpoint_host"] or "",
         status["region"] or "",
         status["public_base_url_configured"],
+        status["public_base_url_effective"],
+        status["presigned_urls_enabled"],
         status["temp_dir"],
         status["temp_dir_writable"],
         status["manim_runtime_dir"],

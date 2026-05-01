@@ -39,6 +39,7 @@ from backend.services.storage_service import (
     upload_file,
     url_for_object,
 )
+from backend.services.generated_media_cleanup import get_active_generated_media, register_generated_media
 
 
 logger = logging.getLogger("parallea.voice")
@@ -504,21 +505,46 @@ def _audio_local_url(filename: str) -> str:
 
 
 def _audio_work_dir() -> Path:
-    return (TMP_DIR / "audio") if storage_enabled() else AUDIO_DIR
+    return TMP_DIR / "audio-responses"
+
+
+def _audio_temp_local_path(session_id: str, filename: str, *, message_id: str | None = None, prefix: str = "") -> Path:
+    name = f"{message_id}{TTS_AUDIO_EXTENSION}" if message_id else filename
+    path = _audio_work_dir()
+    if prefix:
+        path = path / safe_object_key(prefix)
+    path = path / safe_object_key(session_id or "session") / safe_object_key(name)
+    return path
 
 
 def _audio_object_key(session_id: str, filename: str, *, message_id: str | None = None, prefix: str = "") -> str:
     name = f"{message_id}{TTS_AUDIO_EXTENSION}" if message_id else filename
-    parts = ["audio-responses"]
+    parts = ["temp", "audio-responses"]
     if prefix:
         parts.append(prefix)
     parts.extend([session_id or "session", name])
     return safe_object_key(*parts)
 
 
-def _publish_audio_file(out_path: Path, filename: str, object_key: str) -> dict:
+def _publish_audio_file(out_path: Path, filename: str, object_key: str, *, session_id: str, message_id: str | None = None) -> dict:
+    size_bytes = out_path.stat().st_size if out_path.exists() else None
     if not storage_enabled():
-        return {"filename": filename, "audio_url": _audio_local_url(filename)}
+        record = register_generated_media(
+            session_id=session_id,
+            message_id=message_id or "",
+            media_type="audio",
+            storage_backend="local",
+            local_path=out_path,
+            content_type="audio/mpeg",
+            size_bytes=size_bytes,
+        )
+        return {
+            "filename": filename,
+            "audio_url": record.get("url"),
+            "storage": {"backend": "local", "generated_media": record, "local_path": str(out_path)},
+            "generated_media_id": record.get("id"),
+            "storage_backend": "local",
+        }
     try:
         stored = upload_file(
             out_path,
@@ -527,12 +553,25 @@ def _publish_audio_file(out_path: Path, filename: str, object_key: str) -> dict:
             metadata={"kind": "audio_response"},
         )
         out_path.unlink(missing_ok=True)
+        record = register_generated_media(
+            session_id=session_id,
+            message_id=message_id or "",
+            media_type="audio",
+            storage_backend="s3",
+            object_key=stored.object_key,
+            url=stored.url,
+            content_type=stored.content_type,
+            size_bytes=stored.size_bytes,
+        )
+        storage_dict = stored.to_dict()
+        storage_dict["generated_media"] = record
         return {
             "filename": filename,
             "audio_url": stored.url,
-            "storage": stored.to_dict(),
+            "storage": storage_dict,
             "object_key": stored.object_key,
             "storage_backend": stored.backend,
+            "generated_media_id": record.get("id"),
         }
     except Exception as exc:  # noqa: BLE001
         logger.exception("audio storage upload failed file=%s key=%s: %s", filename, object_key, exc)
@@ -554,10 +593,10 @@ async def speak_text(
     message_id: str | None = None,
 ) -> dict:
     filename = f"{session_id}_{uuid.uuid4().hex}{TTS_AUDIO_EXTENSION}"
-    out_path = _audio_work_dir() / filename
+    out_path = _audio_temp_local_path(session_id, filename, message_id=message_id)
     await synthesize_to_file(text=text, voice_id=voice_id, lang=lang, out_path=out_path, fallback_voice=fallback_voice)
     object_key = _audio_object_key(session_id, filename, message_id=message_id)
-    return _publish_audio_file(out_path, filename, object_key)
+    return _publish_audio_file(out_path, filename, object_key, session_id=session_id, message_id=message_id)
 
 
 async def speak_cached(
@@ -569,18 +608,41 @@ async def speak_cached(
 ) -> dict:
     safe_key = "".join(ch if ch.isalnum() or ch in {"_", "-"} else "_" for ch in cache_key).strip("_") or "cached_audio"
     filename = f"{safe_key}{TTS_AUDIO_EXTENSION}"
-    out_path = _audio_work_dir() / filename
+    out_path = _audio_temp_local_path("cached", filename)
     object_key = _audio_object_key("cached", filename)
+    existing = get_active_generated_media("cached", safe_key, "audio")
+    if existing and existing.get("url"):
+        local_path_text = str(existing.get("local_path") or "")
+        local_path = Path(local_path_text) if local_path_text else None
+        if existing.get("storage_backend") == "s3" or (local_path is not None and local_path.exists()):
+            return {
+                "filename": filename,
+                "audio_url": existing.get("url"),
+                "object_key": existing.get("object_key"),
+                "storage_backend": existing.get("storage_backend"),
+                "generated_media_id": existing.get("id"),
+                "storage": {"backend": existing.get("storage_backend"), "generated_media": existing},
+            }
     if storage_enabled() and object_exists(object_key):
+        record = register_generated_media(
+            session_id="cached",
+            message_id=safe_key,
+            media_type="audio",
+            storage_backend="s3",
+            object_key=object_key,
+            url=url_for_object(object_key),
+            content_type="audio/mpeg",
+        )
         return {
             "filename": filename,
-            "audio_url": url_for_object(object_key),
+            "audio_url": record.get("url"),
             "object_key": object_key,
             "storage_backend": "s3",
+            "generated_media_id": record.get("id"),
         }
     if not out_path.exists() or out_path.stat().st_size <= 0:
         await synthesize_to_file(text=text, voice_id=voice_id, lang=lang, out_path=out_path, fallback_voice=fallback_voice)
-    return _publish_audio_file(out_path, filename, object_key)
+    return _publish_audio_file(out_path, filename, object_key, session_id="cached", message_id=safe_key)
 
 
 async def speak_segments(
@@ -599,16 +661,17 @@ async def speak_segments(
             continue
         segment_id = "".join(ch if ch.isalnum() or ch in {"_", "-"} else "_" for ch in str(segment.get("segment_id") or f"segment_{idx}"))
         filename = f"{session_id}_{segment_id}_{uuid.uuid4().hex}{TTS_AUDIO_EXTENSION}"
-        out_path = _audio_work_dir() / filename
+        out_path = _audio_temp_local_path(session_id, filename, message_id=segment_id)
         await synthesize_to_file(text=text, voice_id=voice_id, lang=lang, out_path=out_path, fallback_voice=fallback_voice)
-        object_key = _audio_object_key(session_id, filename)
-        published = _publish_audio_file(out_path, filename, object_key)
+        object_key = _audio_object_key(session_id, filename, message_id=segment_id)
+        published = _publish_audio_file(out_path, filename, object_key, session_id=session_id, message_id=segment_id)
         results.append(
             {
                 "segment_id": segment.get("segment_id") or f"segment_{idx}",
                 "text": text,
                 "audio_url": published.get("audio_url"),
                 "storage": published.get("storage"),
+                "generated_media_id": published.get("generated_media_id"),
             }
         )
     return results

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import mimetypes
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
@@ -30,6 +31,10 @@ from backend.services.session_manager import (
     mark_video_part_ended,
     send_message,
     set_topic,
+)
+from backend.services.generated_media_cleanup import (
+    active_generated_media_for_file,
+    delete_generated_media_for_message,
 )
 from backend.services.storage_service import url_for_object
 from backend.services.supabase_analytics import track_question_asked, track_session_started
@@ -54,11 +59,40 @@ STUDENT_PAGES = {
 }
 
 
+def _require_owned_session(session_id: str, user: dict) -> dict:
+    session = sessions_repo.get(session_id)
+    if not session or session.get("student_id") != user["id"]:
+        raise HTTPException(status_code=404, detail="session not found")
+    return session
+
+
+def _require_session_message(session_id: str, message_id: str) -> dict:
+    message = messages_repo.get(message_id)
+    if not message or message.get("session_id") != session_id:
+        raise HTTPException(status_code=404, detail="message not found")
+    return message
+
+
 def _serve_page(slug: str) -> HTMLResponse:
     path = STUDENT_PAGES.get(slug)
     if not path or not path.exists():
         raise HTTPException(status_code=404, detail=f"student page '{slug}' missing")
     return HTMLResponse(path.read_text(encoding="utf-8"))
+
+
+@router.get("/api/student/generated-media/{media_id}")
+def api_generated_media_file(media_id: str):
+    media = active_generated_media_for_file(media_id)
+    if not media:
+        raise HTTPException(status_code=404, detail="generated media not found")
+    if media.get("storage_backend") != "local":
+        raise HTTPException(status_code=404, detail="generated media is not local")
+    path_text = str(media.get("local_path") or "")
+    path = Path(path_text)
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="generated media file missing")
+    media_type = media.get("content_type") or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    return FileResponse(path, media_type=media_type)
 
 
 def _client_message_id(payload: dict[str, Any]) -> str | None:
@@ -285,6 +319,28 @@ async def api_message_audio(session_id: str, message_id: str, user: dict = Depen
         "storage": storage_meta or None,
         "object_key": result.get("object_key"),
         "storage_backend": result.get("storage_backend"),
+        "generated_media_id": result.get("generated_media_id"),
     }
     messages_repo.update(message_id, {"extra": extra})
-    return {"audio_url": result["audio_url"], "voice_id": voice_id, "storage": result.get("storage")}
+    return {
+        "audio_url": result["audio_url"],
+        "voice_id": voice_id,
+        "storage": result.get("storage"),
+        "generated_media_id": result.get("generated_media_id"),
+    }
+
+
+@router.post("/api/student/sessions/{session_id}/messages/{message_id}/visual-ended")
+def api_visual_ended(session_id: str, message_id: str, user: dict = Depends(require_student)):
+    _require_owned_session(session_id, user)
+    _require_session_message(session_id, message_id)
+    result = delete_generated_media_for_message(session_id, message_id, "manim_video")
+    return {"success": bool(result.get("success")), "deleted": result.get("deleted", 0), "skipped": bool(result.get("skipped"))}
+
+
+@router.post("/api/student/sessions/{session_id}/messages/{message_id}/audio-ended")
+def api_audio_ended(session_id: str, message_id: str, user: dict = Depends(require_student)):
+    _require_owned_session(session_id, user)
+    _require_session_message(session_id, message_id)
+    result = delete_generated_media_for_message(session_id, message_id, "audio")
+    return {"success": bool(result.get("success")), "deleted": result.get("deleted", 0), "skipped": bool(result.get("skipped"))}

@@ -45,6 +45,131 @@ PART_UNDERSTANDING_QUESTION = "Is there anything in this part that you didn't un
 CLARIFICATION_FOLLOWUP = "Does that make sense now?"
 MANIM_SCENE_CLASS_NAME = "GeneratedScene"
 
+_MANIM_REGION_HELPERS_CODE = '''config.frame_width = 14.222
+config.frame_height = 8.0
+config.pixel_width = 1280
+config.pixel_height = 720
+
+SAFE_MARGIN = 0.35
+FRAME_WIDTH = 14.222
+FRAME_HEIGHT = 8.0
+REGION_CENTERS = {
+    "title": UP * 3.25,
+    "left": LEFT * 3.35 + UP * 0.05,
+    "right": RIGHT * 3.25 + UP * 0.05,
+    "bottom": DOWN * 3.25,
+}
+REGION_SIZES = {
+    "title": (12.2, 0.9),
+    "left": (5.6, 5.0),
+    "right": (5.6, 5.0),
+    "bottom": (12.0, 0.75),
+}
+
+def fit_to_region(mobject, max_width, max_height):
+    if mobject.width > max_width:
+        mobject.scale_to_fit_width(max_width)
+    if mobject.height > max_height:
+        mobject.scale_to_fit_height(max_height)
+    return mobject
+
+def keep_inside_frame(mobject):
+    half_w = FRAME_WIDTH / 2 - SAFE_MARGIN
+    half_h = FRAME_HEIGHT / 2 - SAFE_MARGIN
+    if mobject.width > half_w * 2:
+        mobject.scale_to_fit_width(half_w * 2)
+    if mobject.height > half_h * 2:
+        mobject.scale_to_fit_height(half_h * 2)
+    dx = 0
+    dy = 0
+    if mobject.get_right()[0] > half_w:
+        dx -= mobject.get_right()[0] - half_w
+    if mobject.get_left()[0] < -half_w:
+        dx += -half_w - mobject.get_left()[0]
+    if mobject.get_top()[1] > half_h:
+        dy -= mobject.get_top()[1] - half_h
+    if mobject.get_bottom()[1] < -half_h:
+        dy += -half_h - mobject.get_bottom()[1]
+    if dx or dy:
+        mobject.shift(RIGHT * dx + UP * dy)
+    return mobject
+
+def safe_text(text, font_size=32, max_width=5.5):
+    mobject = Text(str(text or ""), font_size=min(int(font_size), 48), color=WHITE)
+    fit_to_region(mobject, max_width, 1.0)
+    return mobject
+
+def bullet_list(items, max_width=5.5, font_size=28):
+    rows = VGroup()
+    for item in list(items or [])[:5]:
+        row = safe_text("- " + str(item), font_size=font_size, max_width=max_width)
+        rows.add(row)
+    if len(rows):
+        rows.arrange(DOWN, aligned_edge=LEFT, buff=0.18)
+    fit_to_region(rows, max_width, 4.7)
+    return rows
+
+def _place_region(mobject, region_name):
+    max_width, max_height = REGION_SIZES[region_name]
+    fit_to_region(mobject, max_width, max_height)
+    mobject.move_to(REGION_CENTERS[region_name])
+    keep_inside_frame(mobject)
+    return mobject
+
+def place_title(mobject):
+    return _place_region(mobject, "title")
+
+def place_left(mobject):
+    return _place_region(mobject, "left")
+
+def place_right(mobject):
+    return _place_region(mobject, "right")
+
+def place_bottom(mobject):
+    return _place_region(mobject, "bottom")
+
+def clear_region(scene, active_regions, region_name):
+    old_mobject = active_regions.get(region_name)
+    if old_mobject is not None:
+        scene.play(FadeOut(old_mobject), run_time=0.4)
+        active_regions[region_name] = None
+
+def replace_region(scene, active_regions, region_name, new_mobject, animation=FadeIn):
+    clear_region(scene, active_regions, region_name)
+    scene.play(animation(new_mobject), run_time=0.6)
+    active_regions[region_name] = new_mobject
+    return new_mobject
+
+def clear_all_regions(scene, active_regions, keep_title=False):
+    for region_name in list(active_regions.keys()):
+        if keep_title and region_name == "title":
+            continue
+        clear_region(scene, active_regions, region_name)
+'''
+
+_MANIM_SAFE_LAYOUT_RULES = """Safe layout rules:
+- Use a 16:9 safe frame with SAFE_MARGIN = 0.35.
+- Keep all important objects inside the safe margin; never place text or diagrams on extreme edges.
+- Use fixed regions: title_region at the top, left_panel for bullets/equations, right_panel for diagrams or creative metaphors, and bottom_region for short takeaways/progress cues.
+- Use the helper functions `safe_text`, `bullet_list`, `place_title`, `place_left`, `place_right`, `place_bottom`, `replace_region`, `clear_region`, and `clear_all_regions`.
+- Use this active region pattern in every scene:
+  active_regions = {"title": None, "left": None, "right": None, "bottom": None}
+  place_left(new_left)
+  replace_region(self, active_regions, "left", new_left)
+- If a new object appears in an occupied region, fade out or transform the previous group first. Do not stack new objects on old ones.
+- Use `FadeOut(old_group)` before `FadeIn(new_group)` when reusing the same region.
+- Prefer VGroup.arrange(), next_to(), align_to(), move_to(), and the predefined place_* helpers. Avoid arbitrary large shift values.
+- Keep text short. Split long explanations into multiple small Text objects. Use max 3-5 visible text items at once.
+- Scale text and diagrams to fit their region before showing them. Never let text exceed frame width.
+- Build step by step. Fade out completed steps before moving to the next concept.
+- Keep visual metaphors creative, but draw them with built-in Manim primitives only. Do not use ImageMobject, SVGMobject, or external assets.
+- Use SurroundingRectangle and arrows sparingly. Do not overlap labels with diagrams."""
+
+_MANIM_REGION_HELPERS_PROMPT = f"""Include this helper block exactly after `from manim import *` in generated Manim files, then use it for placement.
+Helper block:
+{_MANIM_REGION_HELPERS_CODE}
+End helper block."""
+
 
 def _clean_spaces(text: Any) -> str:
     return " ".join(str(text or "").split())
@@ -196,9 +321,13 @@ LaTeX status:
 
 
 def _manim_visual_system(*, force_no_latex: bool = False, rejection_reason: str = "") -> str:
-    return _MANIM_VISUAL_SYSTEM_BASE + "\n\n" + _manim_latex_prompt_rules(
-        force_no_latex=force_no_latex,
-        rejection_reason=rejection_reason,
+    return "\n\n".join(
+        [
+            _MANIM_VISUAL_SYSTEM_BASE,
+            _MANIM_SAFE_LAYOUT_RULES,
+            _MANIM_REGION_HELPERS_PROMPT,
+            _manim_latex_prompt_rules(force_no_latex=force_no_latex, rejection_reason=rejection_reason),
+        ]
     )
 
 
@@ -318,7 +447,36 @@ Rules:
 
 
 def _combined_teaching_system_prompt() -> str:
-    return _COMBINED_TEACHING_SYSTEM_BASE + "\n\n" + _manim_latex_prompt_rules()
+    return "\n\n".join(
+        [
+            _COMBINED_TEACHING_SYSTEM_BASE,
+            _MANIM_SAFE_LAYOUT_RULES,
+            _MANIM_REGION_HELPERS_PROMPT,
+            _manim_latex_prompt_rules(),
+        ]
+    )
+
+
+def _clarify_roadmap_part_system_prompt() -> str:
+    return "\n\n".join(
+        [
+            _CLARIFY_ROADMAP_PART_SYSTEM,
+            _MANIM_SAFE_LAYOUT_RULES,
+            _MANIM_REGION_HELPERS_PROMPT,
+            _manim_latex_prompt_rules(),
+        ]
+    )
+
+
+def _manim_repair_system_prompt(*, force_no_latex: bool = False, rejection_reason: str = "") -> str:
+    return "\n\n".join(
+        [
+            _MANIM_REPAIR_SYSTEM,
+            _MANIM_SAFE_LAYOUT_RULES,
+            _MANIM_REGION_HELPERS_PROMPT,
+            _manim_latex_prompt_rules(force_no_latex=force_no_latex, rejection_reason=rejection_reason),
+        ]
+    )
 
 
 def build_roadmap_part_context(roadmap: dict[str, Any] | None, part: dict[str, Any] | None) -> str:
@@ -581,40 +739,77 @@ def _fallback_combined_manim_code(*, title: str, topic: str, speech_segments: li
     labels_literal = json.dumps(labels)
     return f'''from manim import *
 
+{_MANIM_REGION_HELPERS_CODE}
+
 class {MANIM_SCENE_CLASS_NAME}(Scene):
     def construct(self):
         self.camera.background_color = BLACK
-        title = Text({title_literal}, font_size=34, color=WHITE)
-        title.scale_to_fit_width(10.8)
-        title.to_edge(UP, buff=0.45)
-        topic = Text({topic_literal}, font_size=24, color=YELLOW)
-        topic.next_to(title, DOWN, buff=0.2)
+        active_regions = {{"title": None, "left": None, "right": None, "bottom": None}}
+        title = safe_text({title_literal}, font_size=34, max_width=12.0)
+        place_title(title)
+        replace_region(self, active_regions, "title", title)
 
         labels = {labels_literal}
-        left = Circle(radius=0.42, color=BLUE)
-        middle = Rectangle(width=1.55, height=0.82, color=GREEN)
-        right = Circle(radius=0.42, color=ORANGE)
-        flow = VGroup(left, middle, right).arrange(RIGHT, buff=1.05)
-        flow.move_to(DOWN * 0.25)
+        left_panel = bullet_list([labels[0], {topic_literal}], max_width=5.2, font_size=25)
+        place_left(left_panel)
+        replace_region(self, active_regions, "left", left_panel)
 
-        dot = Dot(left.get_center(), radius=0.08, color=YELLOW)
-        arrow_one = Arrow(left.get_right(), middle.get_left(), buff=0.15, color=BLUE)
-        arrow_two = Arrow(middle.get_right(), right.get_left(), buff=0.15, color=BLUE)
-        caption = Text(labels[0], font_size=24, color=WHITE)
-        caption.scale_to_fit_width(9.2)
-        caption.to_edge(DOWN, buff=0.7)
+        start = Circle(radius=0.42, color=BLUE)
+        change = Rectangle(width=1.35, height=0.76, color=GREEN)
+        result = Circle(radius=0.42, color=ORANGE)
+        flow = VGroup(start, change, result).arrange(RIGHT, buff=0.75)
+        arrows = VGroup(
+            Arrow(start.get_right(), change.get_left(), buff=0.12, color=BLUE),
+            Arrow(change.get_right(), result.get_left(), buff=0.12, color=BLUE),
+        )
+        diagram = VGroup(flow, arrows)
+        place_right(diagram)
+        replace_region(self, active_regions, "right", diagram)
 
-        self.play(Write(title), FadeIn(topic, shift=DOWN * 0.08), run_time=0.7)
-        self.play(Create(left), FadeIn(dot), Write(caption), run_time=0.8)
-        self.play(Create(arrow_one), dot.animate.move_to(middle.get_center()), Transform(caption, Text(labels[min(1, len(labels)-1)], font_size=24, color=WHITE).scale_to_fit_width(9.2).to_edge(DOWN, buff=0.7)), run_time=1.2)
-        self.play(Create(middle), Indicate(middle, color=YELLOW), run_time=0.7)
-        self.play(Create(arrow_two), dot.animate.move_to(right.get_center()), Transform(caption, Text(labels[min(2, len(labels)-1)], font_size=24, color=WHITE).scale_to_fit_width(9.2).to_edge(DOWN, buff=0.7)), run_time=1.2)
-        self.play(Create(right), Circumscribe(flow, color=YELLOW), run_time=0.8)
+        caption = safe_text(labels[0], font_size=24, max_width=11.5)
+        place_bottom(caption)
+        replace_region(self, active_regions, "bottom", caption)
+
+        step_diagram = VGroup(
+            Circle(radius=0.42, color=BLUE),
+            Rectangle(width=1.35, height=0.76, color=YELLOW),
+            Circle(radius=0.42, color=ORANGE),
+        ).arrange(RIGHT, buff=0.75)
+        step_arrows = VGroup(
+            Arrow(step_diagram[0].get_right(), step_diagram[1].get_left(), buff=0.12, color=BLUE),
+            Arrow(step_diagram[1].get_right(), step_diagram[2].get_left(), buff=0.12, color=BLUE),
+        )
+        step_group = VGroup(step_diagram, step_arrows)
+        place_right(step_group)
+        replace_region(self, active_regions, "right", step_group)
+        next_left = bullet_list(labels[:3], max_width=5.2, font_size=25)
+        place_left(next_left)
+        replace_region(self, active_regions, "left", next_left)
+
+        if len(labels) > 1:
+            next_caption = safe_text(labels[1], font_size=24, max_width=11.5)
+            place_bottom(next_caption)
+            replace_region(self, active_regions, "bottom", next_caption)
+        final_diagram = VGroup(
+            Circle(radius=0.42, color=BLUE),
+            Rectangle(width=1.35, height=0.76, color=GREEN),
+            Circle(radius=0.42, color=YELLOW),
+        ).arrange(RIGHT, buff=0.75)
+        final_arrows = VGroup(
+            Arrow(final_diagram[0].get_right(), final_diagram[1].get_left(), buff=0.12, color=BLUE),
+            Arrow(final_diagram[1].get_right(), final_diagram[2].get_left(), buff=0.12, color=BLUE),
+        )
+        final_group = VGroup(final_diagram, final_arrows)
+        place_right(final_group)
+        replace_region(self, active_regions, "right", final_group)
+        if len(labels) > 2:
+            final_caption = safe_text(labels[2], font_size=24, max_width=11.5)
+            place_bottom(final_caption)
+            replace_region(self, active_regions, "bottom", final_caption)
         if len(labels) > 3:
-            final_caption = Text(labels[3], font_size=24, color=YELLOW)
-            final_caption.scale_to_fit_width(9.2)
-            final_caption.to_edge(DOWN, buff=0.7)
-            self.play(Transform(caption, final_caption), run_time=0.5)
+            takeaway = safe_text(labels[3], font_size=24, max_width=11.5)
+            place_bottom(takeaway)
+            replace_region(self, active_regions, "bottom", takeaway)
         self.wait(1.0)
 '''
 
@@ -933,7 +1128,7 @@ async def generate_teaching_response_with_visuals(
             "teaching_pipeline",
             _combined_teaching_system_prompt(),
             user_prompt,
-            max_tokens=4600,
+            max_tokens=6000,
             temperature=0.2,
         )
     except Exception as exc:  # noqa: BLE001
@@ -1028,18 +1223,23 @@ Visual plan with timestamps:
 Failed Manim code:
 {failed_code}
 
-Validation/render error log:
+Full validation/render error log, including final stderr/stdout tails when available:
 {error_log}
 
 Task:
 Repair the Manim code so it renders safely and still follows the same spoken answer and visual plan.
+Simplify the scene if the error came from animation complexity, mobject state, transform matching, or unsupported Manim behavior.
+Rewrite it using the region-based layout helpers. Preserve the educational idea and creative metaphor, but prevent cropped objects, overlapping objects, and stacked replacements.
+Before showing new content in an occupied region, call replace_region(self, active_regions, region_name, new_group) so the previous group fades out first.
+Avoid complex transforms if they caused failure; prefer simple FadeOut/FadeIn region replacement.
+Use only built-in Manim primitives and avoid external assets.
 """.strip()
     try:
         result = await llm_json(
             "visual",
-            _MANIM_REPAIR_SYSTEM + "\n\n" + _manim_latex_prompt_rules(force_no_latex=manim_text_only_mode(), rejection_reason=error_log[:400]),
+            _manim_repair_system_prompt(force_no_latex=manim_text_only_mode(), rejection_reason=error_log[:400]),
             user,
-            max_tokens=3200,
+            max_tokens=4500,
             temperature=0.1,
         )
     except Exception as exc:  # noqa: BLE001
@@ -1188,9 +1388,9 @@ async def clarify_roadmap_part(
     )
     payload = await llm_json(
         "clarification",
-        _CLARIFY_ROADMAP_PART_SYSTEM + "\n\n" + _manim_latex_prompt_rules(),
+        _clarify_roadmap_part_system_prompt(),
         user,
-        max_tokens=4200,
+        max_tokens=5600,
         temperature=0.25,
     )
     normalized = _normalize_clarify_roadmap_part(payload, topic=topic, part=part, student_query=student_query)
@@ -1265,7 +1465,7 @@ Visual cues/timestamps:
 """.strip()
     text_only = manim_text_only_mode()
     try:
-        result = await llm_json("visual", _manim_visual_system(), user, max_tokens=2800, temperature=0.15)
+        result = await llm_json("visual", _manim_visual_system(), user, max_tokens=4200, temperature=0.15)
         code = (result.get("manimCode") or result.get("code") or "").strip() if isinstance(result, dict) else ""
         logger.info("[manim] code_received length=%s text_only_mode=%s latex_available=%s", len(code), text_only, has_latex_available())
         validation_error = direct_manim_validation_error(code) if code else "empty Manim code"
@@ -1281,7 +1481,7 @@ Visual cues/timestamps:
                 "visual",
                 _manim_visual_system(force_no_latex=text_only, rejection_reason=validation_error),
                 retry_user,
-                max_tokens=2800,
+                max_tokens=4200,
                 temperature=0.1,
             )
             retry_code = (retry.get("manimCode") or retry.get("code") or "").strip() if isinstance(retry, dict) else ""
@@ -1490,35 +1690,42 @@ def _fallback_manim_code(*, topic: str, part: dict[str, Any] | None, student_que
     concepts = json.dumps([str(item)[:34] for item in concept_items[:4]])
     return f'''from manim import *
 
+{_MANIM_REGION_HELPERS_CODE}
+
 class {MANIM_SCENE_CLASS_NAME}(Scene):
     def construct(self):
         self.camera.background_color = BLACK
-        title = Text({title}, font_size=34, color=WHITE)
-        title.scale_to_fit_width(10.6)
-        title.to_edge(UP, buff=0.45)
-        caption = Text({caption}, font_size=26, color=YELLOW)
-        caption.scale_to_fit_width(10.5)
-        caption.next_to(title, DOWN, buff=0.35)
+        active_regions = {{"title": None, "left": None, "right": None, "bottom": None}}
+        title = safe_text({title}, font_size=34, max_width=12.0)
+        place_title(title)
+        replace_region(self, active_regions, "title", title)
+
         items = {concepts}
+        left_panel = bullet_list(items, max_width=5.2, font_size=25)
+        place_left(left_panel)
+        replace_region(self, active_regions, "left", left_panel)
+
         cards = VGroup()
         for index, item in enumerate(items):
-            box = Rectangle(width=2.55, height=1.1, color=ORANGE)
-            label = Text(str(item), font_size=22, color=WHITE)
-            label.scale_to_fit_width(2.18)
+            box = Rectangle(width=1.55, height=0.88, color=ORANGE)
+            label = safe_text(str(item), font_size=21, max_width=1.35)
             label.move_to(box.get_center())
             cards.add(VGroup(box, label))
-        cards.arrange(RIGHT, buff=0.35)
-        cards.move_to(DOWN * 0.45)
+        cards.arrange(DOWN, buff=0.18)
+        fit_to_region(cards, 4.8, 4.2)
         arrows = VGroup()
         for index in range(max(0, len(cards) - 1)):
-            arrows.add(Arrow(cards[index].get_right(), cards[index + 1].get_left(), buff=0.12, color=BLUE))
-        follow = Text("Does that make sense now?", font_size=24, color=YELLOW)
-        follow.next_to(cards, DOWN, buff=0.42)
-        self.play(FadeIn(title, shift=DOWN * 0.1), FadeIn(caption, shift=DOWN * 0.1), run_time=0.8)
-        for index, card in enumerate(cards):
-            self.play(FadeIn(card, shift=UP * 0.12), run_time=0.45)
-            if index < len(arrows):
-                self.play(Create(arrows[index]), run_time=0.25)
-        self.play(FadeIn(follow, shift=UP * 0.08), run_time=0.35)
+            arrows.add(Arrow(cards[index].get_bottom(), cards[index + 1].get_top(), buff=0.1, color=BLUE))
+        diagram = VGroup(cards, arrows)
+        place_right(diagram)
+        replace_region(self, active_regions, "right", diagram)
+
+        caption = safe_text({caption}, font_size=24, max_width=11.5)
+        place_bottom(caption)
+        replace_region(self, active_regions, "bottom", caption)
+
+        follow = safe_text("Does that make sense now?", font_size=23, max_width=11.5)
+        place_bottom(follow)
+        replace_region(self, active_regions, "bottom", follow)
         self.wait(1.4)
 '''

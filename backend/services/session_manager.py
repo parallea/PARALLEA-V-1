@@ -1022,17 +1022,52 @@ async def _clarify_current_roadmap_part(session_id: str, student_text: str) -> d
 
 def _extract_manim_error_log(exc: Exception) -> str:
     text = str(exc)
-    marker = "stderr_log="
-    if marker not in text:
+    debug = _extract_manim_debug_artifacts(exc)
+    if not debug:
         return text
-    path_text = text.split(marker, 1)[1].strip().strip('"')
+    sections = [text]
+    stderr_tail = _read_log_tail(debug.get("stderr_log"), 14000)
+    stdout_tail = _read_log_tail(debug.get("stdout_log"), 9000)
+    if stderr_tail:
+        sections.append(f"STDERR_LOG_TAIL_BEGIN\n{stderr_tail}\nSTDERR_LOG_TAIL_END")
+    if stdout_tail:
+        sections.append(f"STDOUT_LOG_TAIL_BEGIN\n{stdout_tail}\nSTDOUT_LOG_TAIL_END")
+    return "\n\n".join(sections)
+
+
+def _read_log_tail(path_text: Any, max_chars: int) -> str:
+    text = str(path_text or "").strip().strip('"')
+    if not text:
+        return ""
     try:
-        path = Path(path_text)
+        path = Path(text)
         if path.exists():
-            return f"{text}\n\nSTDERR_LOG_BEGIN\n{path.read_text(encoding='utf-8', errors='replace')[-5000:]}\nSTDERR_LOG_END"
+            data = path.read_text(encoding="utf-8", errors="replace")
+            return data[-max_chars:]
     except Exception:
-        return text
-    return text
+        return ""
+    return ""
+
+
+def _extract_manim_debug_artifacts(exc: Exception) -> dict[str, str]:
+    text = str(exc)
+    keys = ["scene_file", "render_id", "failure_stage", "return_code", "error_summary", "command", "stderr_log", "stdout_log", "debug_meta"]
+    artifacts: dict[str, str] = {}
+    for key in keys:
+        match = re.search(rf"{key}=([^=]+?)(?=\s(?:{'|'.join(keys)})=|$)", text)
+        if match:
+            artifacts[key] = match.group(1).strip().strip('"')
+    return artifacts
+
+
+def _visual_complexity_label(visual_plan: Any, code: str) -> str:
+    segment_count = len(visual_plan) if isinstance(visual_plan, list) else 0
+    code_chars = len(code or "")
+    if segment_count <= 3 and code_chars < 4200:
+        return "low"
+    if segment_count > 6 or code_chars > 7500:
+        return "high"
+    return "medium"
 
 
 async def _render_teaching_visual(
@@ -1064,6 +1099,8 @@ async def _render_teaching_visual(
         }
     code = (visual_payload.get("manimCode") or "").strip()
     code_source = (visual_payload.get("manimCodeSource") or "ai_generated" if code else "local_fallback")
+    repair_attempted = False
+    repair_used = False
     validation_error = direct_manim_validation_error(code) if code else "empty Manim code"
     visual_prompt = (visual_payload.get("visualPrompt") or visual_payload.get("manimPlan") or "").strip()
     logger.info(
@@ -1079,6 +1116,7 @@ async def _render_teaching_visual(
     visual_plan = payload.get("visualPlanWithTimestamps") or visual_payload.get("segments") or visual_payload.get("timestamps") or []
     if validation_error:
         logger.warning("[manim] generated code validation failed before render; attempting one repair session=%s title=%s error=%s", session_id, title, validation_error)
+        repair_attempted = True
         repaired = await repair_manim_code_with_error(
             failed_code=code,
             error_log=validation_error,
@@ -1092,6 +1130,7 @@ async def _render_teaching_visual(
         if repaired_code and not repaired_error:
             code = repaired_code
             code_source = repaired.get("source") or "ai_repaired"
+            repair_used = True
             validation_error = None
             logger.info("[manim] validation repair succeeded session=%s title=%s model=%s", session_id, title, repaired.get("model"))
         else:
@@ -1106,6 +1145,7 @@ async def _render_teaching_visual(
             validation_error = direct_manim_validation_error(code)
 
     sync_plan = payload.get("syncPlan") or {}
+    visual_complexity = _visual_complexity_label(visual_plan, code)
     renderer_payload = {
         "renderer_version": "openai_direct_manim_v1",
         "scene_type": "openai_direct",
@@ -1121,6 +1161,13 @@ async def _render_teaching_visual(
         "student_query": student_query,
         "visual_prompt": visual_prompt,
         "manim_code_source": code_source,
+        "layout_mode": "region_safe",
+        "region_replacement_used": True,
+        "visual_complexity": visual_complexity,
+        "repair_used": repair_used,
+        "repair_attempted": repair_attempted,
+        "fallback_attempted": False,
+        "render_failure_stage": "repaired" if repair_used else "generated",
     }
     try:
         try:
@@ -1133,6 +1180,7 @@ async def _render_teaching_visual(
             error_log = _extract_manim_error_log(first_exc)
             if code_source != "local_fallback":
                 logger.warning("[manim] first render failed; attempting one AI repair session=%s title=%s error=%s", session_id, title, str(first_exc)[:300])
+                repair_attempted = True
                 repaired = await repair_manim_code_with_error(
                     failed_code=code,
                     error_log=error_log,
@@ -1144,7 +1192,16 @@ async def _render_teaching_visual(
                 repaired_code = str(repaired.get("manim_code") or "").strip()
                 repaired_error = direct_manim_validation_error(repaired_code) if repaired_code else repaired.get("error") or "empty repaired Manim code"
                 if repaired_code and not repaired_error:
-                    repair_payload = {**renderer_payload, "manim_code": repaired_code, "manim_code_source": repaired.get("source") or "ai_repaired"}
+                    repair_used = True
+                    repair_payload = {
+                        **renderer_payload,
+                        "manim_code": repaired_code,
+                        "manim_code_source": repaired.get("source") or "ai_repaired",
+                        "repair_used": True,
+                        "repair_attempted": True,
+                        "render_failure_stage": "repaired",
+                        "visual_complexity": _visual_complexity_label(visual_plan, repaired_code),
+                    }
                     try:
                         rendered = await render_manim_payload_async(
                             repair_payload,
@@ -1185,6 +1242,11 @@ async def _render_teaching_visual(
             "media_url": media_url,
             "usedFallback": used_fallback,
             "manimCodeSource": code_source,
+            "layout_mode": "region_safe",
+            "region_replacement_used": True,
+            "visual_complexity": renderer_payload.get("visual_complexity") or visual_complexity,
+            "repair_used": repair_used,
+            "repair_attempted": repair_attempted,
             "error": None,
             "timestamps": timestamps,
             "syncPlan": sync_plan,
@@ -1196,11 +1258,17 @@ async def _render_teaching_visual(
                 "duration_sec": renderer_payload["duration_sec"],
                 "used_fallback": used_fallback,
                 "manim_code_source": code_source,
+                "layout_mode": "region_safe",
+                "region_replacement_used": True,
+                "visual_complexity": renderer_payload.get("visual_complexity") or visual_complexity,
+                "repair_used": repair_used,
+                "repair_attempted": repair_attempted,
                 "validation": validation,
                 "cache_hit": bool(rendered.get("cache_hit")),
             },
         }
     except Exception as exc:  # noqa: BLE001
+        primary_debug_artifacts = _extract_manim_debug_artifacts(exc)
         logger.warning("[manim] rendering generated/repaired code failed; rendering local fallback session=%s title=%s error=%s", session_id, title, exc)
         fallback_code = build_fallback_manim_code(
             title=title,
@@ -1213,6 +1281,14 @@ async def _render_teaching_visual(
             "manim_code": fallback_code,
             "manim_code_source": "local_fallback",
             "_disable_render_fallback": False,
+            "layout_mode": "region_safe",
+            "region_replacement_used": True,
+            "visual_complexity": _visual_complexity_label(visual_plan, fallback_code),
+            "repair_used": repair_used,
+            "repair_attempted": repair_attempted,
+            "fallback_attempted": True,
+            "render_failure_stage": "fallback",
+            "previous_failure_debug": primary_debug_artifacts,
         }
         try:
             rendered = await render_manim_payload_async(
@@ -1232,6 +1308,11 @@ async def _render_teaching_visual(
                 "media_url": media_url,
                 "usedFallback": True,
                 "manimCodeSource": "local_fallback",
+                "layout_mode": "region_safe",
+                "region_replacement_used": True,
+                "visual_complexity": fallback_payload.get("visual_complexity"),
+                "repair_used": repair_used,
+                "repair_attempted": repair_attempted,
                 "error": None,
                 "timestamps": timestamps,
                 "syncPlan": sync_plan,
@@ -1243,10 +1324,18 @@ async def _render_teaching_visual(
                     "duration_sec": fallback_payload["duration_sec"],
                     "used_fallback": True,
                     "manim_code_source": "local_fallback",
+                    "layout_mode": "region_safe",
+                    "region_replacement_used": True,
+                    "visual_complexity": fallback_payload.get("visual_complexity"),
+                    "repair_used": repair_used,
+                    "repair_attempted": repair_attempted,
+                    "previous_failure_debug": primary_debug_artifacts,
                     "cache_hit": bool(rendered.get("cache_hit")),
                 },
             }
         except Exception as fallback_exc:  # noqa: BLE001
+            fallback_debug_artifacts = _extract_manim_debug_artifacts(fallback_exc)
+            fallback_error_log = _extract_manim_error_log(fallback_exc)
             logger.exception("[manim] local fallback render failed session=%s title=%s error=%s", session_id, title, fallback_exc)
         return {
             "type": "manim",
@@ -1257,7 +1346,20 @@ async def _render_teaching_visual(
             "media_url": None,
             "usedFallback": False,
             "manimCodeSource": code_source,
-            "error": "The Manim visual failed to render, but the spoken clarification is available.",
+            "layout_mode": "region_safe",
+            "region_replacement_used": True,
+            "visual_complexity": visual_complexity,
+            "repair_used": repair_used,
+            "repair_attempted": repair_attempted,
+            "error": "Visual failed to render, but audio explanation is available.",
+            "debugArtifacts": fallback_debug_artifacts if "fallback_debug_artifacts" in locals() else primary_debug_artifacts,
+            "errorSummary": (fallback_debug_artifacts if "fallback_debug_artifacts" in locals() else primary_debug_artifacts).get("error_summary", ""),
+            "payload": {
+                "debug_artifacts": fallback_debug_artifacts if "fallback_debug_artifacts" in locals() else primary_debug_artifacts,
+                "previous_failure_debug": primary_debug_artifacts,
+                "error_summary": (fallback_debug_artifacts if "fallback_debug_artifacts" in locals() else primary_debug_artifacts).get("error_summary", ""),
+                "fallback_error_log_tail": fallback_error_log[-4000:] if "fallback_error_log" in locals() else "",
+            },
             "timestamps": timestamps,
             "syncPlan": sync_plan,
         }

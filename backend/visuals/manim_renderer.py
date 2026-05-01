@@ -109,6 +109,11 @@ def build_storyboard_scene_source(scene_name: str, payload: dict[str, Any]) -> s
 import json
 import numpy as np
 
+config.frame_width = 14.222
+config.frame_height = 8.0
+config.pixel_width = 1280
+config.pixel_height = 720
+
 PAYLOAD = json.loads(PAYLOAD_LITERAL)
 LATEX_AVAILABLE = __LATEX_AVAILABLE__
 BG = "#0a0e13"

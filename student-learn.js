@@ -13,6 +13,9 @@
   let videoPlaying = false;
   let activeVideoToken = 0;
   let activeManimVideo = null;
+  let activeManimMessageId = null;
+  let visualCleanupRequested = false;
+  const audioCleanupRequested = new Set();
   let manimSyncState = 'idle';
   let pendingTranscriptConfirmation = null;
 
@@ -84,6 +87,27 @@
   }
   function flowLog(message, data){
     try{ console.debug('[immersive-flow] ' + message, data || {}); }catch(_){}
+  }
+
+  async function notifyGeneratedMediaEnded(kind, messageId){
+    if(!session || !messageId) return;
+    const endpointKind = kind === 'visual' ? 'visual-ended' : 'audio-ended';
+    const cleanupKey = `${endpointKind}:${messageId}`;
+    if(kind === 'visual'){
+      if(visualCleanupRequested) return;
+      visualCleanupRequested = true;
+    }else if(audioCleanupRequested.has(cleanupKey)){
+      return;
+    }else{
+      audioCleanupRequested.add(cleanupKey);
+    }
+    flowLog(`${kind} ended; cleanup requested`, {messageId});
+    try{
+      const r = await fetchJson(`/api/student/sessions/${session.id}/messages/${messageId}/${endpointKind}`, {method:'POST'});
+      flowLog(`${kind} cleanup ${r.ok ? 'success' : 'failure'}`, {messageId, status:r.status, body:r.body});
+    }catch(err){
+      flowLog(`${kind} cleanup failure`, {messageId, error:String(err)});
+    }
   }
   function setManimSyncState(state, meta){
     manimSyncState = state || 'idle';
@@ -717,7 +741,21 @@
       }
       resumeVadAfterAssistant();
     };
-    audio.onended = finish;
+    audio.onended = () => {
+      notifyGeneratedMediaEnded('audio', messageId);
+      if(activeManimVideo){
+        notifyGeneratedMediaEnded('visual', messageId);
+        try{
+          activeManimVideo.removeAttribute('src');
+          activeManimVideo.load();
+        }catch(_){}
+      }
+      finish();
+      try{
+        audio.removeAttribute('src');
+        audio.load();
+      }catch(_){}
+    };
     audio.onerror = finish;
     const startBoth = () => {
       if(video) alignManimToAudio(audio, video);
@@ -803,6 +841,7 @@
     }
 
     activeManimVideo = null;
+    activeManimMessageId = null;
     setManimSyncState('idle');
     setScene('avatar');
     if(message && message.role === 'assistant' && opts.autoplay !== false){
@@ -825,6 +864,7 @@
     const videoInfo = envelope.currentVideo;
     setScene('video');
     activeManimVideo = null;
+    activeManimMessageId = null;
     setManimSyncState('idle', {source:'original_video_part'});
     videoPlaying = true;
     setSpeakState('idle');
@@ -904,6 +944,9 @@
 
   function buildManimUrl(rawUrl){
     if(!rawUrl) return '';
+    if(/^https?:\/\//i.test(rawUrl) && /(?:X-Amz-Signature|X-Amz-Credential|Signature=)/i.test(rawUrl)){
+      return rawUrl;
+    }
     const sep = rawUrl.indexOf('?') >= 0 ? '&' : '?';
     return `${rawUrl}${sep}t=${Date.now()}`;
   }
@@ -917,6 +960,8 @@
     dom.clarifyTitle.textContent = (part && part.title) || 'Visual explanation';
     dom.manimStage.innerHTML = '';
     activeManimVideo = null;
+    activeManimMessageId = message.id || null;
+    visualCleanupRequested = false;
 
     const status = visual.status || visual.renderStatus || 'pending';
     setManimSyncState('waiting_for_visual', {status});
@@ -933,6 +978,7 @@
       const cacheBustUrl = buildManimUrl(rawUrl);
       const v = document.createElement('video');
       v.id = 'clarificationManim';
+      v.className = 'manim-video';
       v.src = cacheBustUrl;
       v.muted = true;
       v.autoplay = true;
@@ -953,12 +999,19 @@
         });
       };
       v.oncanplay = () => flowLog('frontend manim_video_loaded', {url: cacheBustUrl});
+      v.onended = () => {
+        notifyGeneratedMediaEnded('visual', activeManimMessageId);
+        try{
+          v.removeAttribute('src');
+          v.load();
+        }catch(_){}
+      };
       v.onerror = () => {
         flowLog('frontend manim_video_error', {url: cacheBustUrl, code: v.error && v.error.code});
         setManimSyncState('visual_failed', {url: cacheBustUrl});
         const err = document.createElement('div');
         err.className = 'manim-status error';
-        err.textContent = 'The visual failed to load. The spoken clarification will continue.';
+        err.textContent = 'Visual failed to render, but audio explanation is available.';
         dom.manimStage.innerHTML = '';
         dom.manimStage.appendChild(err);
         activeManimVideo = null;
@@ -990,7 +1043,7 @@
     const isFailed = status === 'failed';
     statusNode.className = 'manim-status' + (isFailed ? ' error' : '');
     statusNode.textContent = isFailed
-      ? (visual.error || 'The visual failed to render, but the spoken clarification will continue.')
+      ? (visual.error || 'Visual failed to render, but audio explanation is available.')
       : 'Preparing visual explanation...';
     dom.manimStage.appendChild(statusNode);
     setManimSyncState(isFailed ? 'visual_failed' : 'waiting_for_visual', {status});
@@ -1015,6 +1068,7 @@
   function showClarificationLoading(){
     setScene('clarify');
     activeManimVideo = null;
+    activeManimMessageId = null;
     setManimSyncState('waiting_for_visual', {status:'rendering'});
     dom.clarifyTitle.textContent = (currentPart && currentPart.title) || 'Visual explanation';
     dom.manimStage.innerHTML = '';
