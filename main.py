@@ -113,7 +113,6 @@ INDEX_HTML = BASE_DIR / "index.html"
 PLAYER_HTML = BASE_DIR / "player.html"
 AVATAR_SELECT_HTML = BASE_DIR / "avatar-select.html"
 LEARN_HTML = BASE_DIR / "learn.html"
-GUITAR_LESSON_HTML = BASE_DIR / "guitar-lesson-1.html"
 DEV_VOICE_TEST_HTML = BASE_DIR / "dev-voice-test.html"
 BOARD_ASSETS_DIR = BASE_DIR / "board_assets"
 
@@ -898,16 +897,16 @@ LESSON_TUTOR_SUGGESTIONS = [
 ]
 
 LESSON_TUTOR_SYSTEM_PROMPT = (
-    "You are a warm, skilled guitar teacher helping a learner progress through a structured lesson. "
+    "You are a warm, skilled teacher helping a learner progress through a structured lesson. "
     "Your role is to guide the learner through the current lesson section step by step. "
     "Always prioritize the current lesson context over general conversation. "
     "Explain things simply, clearly, and encouragingly. "
-    "Use beginner-friendly music teaching language. "
-    "When useful, give practical exercises involving finger placement, hand position, rhythm, chord switching, strumming, listening, or repetition. "
+    "Use beginner-friendly teaching language. "
+    "When useful, give practical exercises tied to the current lesson context. "
     "Keep responses conversational and not too long. "
     "If the learner is confused, explain in a different way. "
     "If the learner asks something outside the lesson, answer briefly and guide them back to the current section. "
-    "You are not a generic chatbot. You are an in-lesson AI guitar tutor."
+    "You are not a generic chatbot. You are an in-lesson AI tutor."
 )
 
 def coerce_text_list(value: Any, limit: int = 12, item_limit: int = 180) -> list[str]:
@@ -1044,7 +1043,7 @@ def lesson_test_prompt(context: dict) -> str:
                 chord = clean_spaces(match.group(1))
                 break
         return f"Quick check. Can you say which fingers belong in {chord} and which string you start strumming from? If you can explain that out loud, your hand map is getting stronger."
-    if "part" in title or "guitar" in title:
+    if "part" in title:
         return "Quick check. Point to the part on the screen, say its name out loud, and say what it does in one simple sentence. If you can do that without guessing, the section is sticking."
     return "Quick check. Tell me the key idea of this section in one sentence, then compare it with the details on the screen."
 
@@ -1885,16 +1884,6 @@ def learn_page(request: Request, video: str | None = Query(default=None)):
 @app.get("/learn.html", response_class=HTMLResponse)
 def learn_html_page(request: Request, video: str | None = Query(default=None)):
     return learn_page(request, video=video)
-
-
-@app.get("/guitar-lesson-1", response_class=HTMLResponse)
-def guitar_lesson_page(request: Request):
-    return _persona_first_redirect(request, student_target="/student/learn/per_demo_guitar_coach")
-
-
-@app.get("/guitar-lesson-1.html", response_class=HTMLResponse)
-def guitar_lesson_html_page(request: Request):
-    return _persona_first_redirect(request, student_target="/student/learn/per_demo_guitar_coach")
 
 
 @app.get("/watch/{video_id}", response_class=HTMLResponse)

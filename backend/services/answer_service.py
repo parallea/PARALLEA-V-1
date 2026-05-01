@@ -28,8 +28,11 @@ from __future__ import annotations
 
 import logging
 import json
+import math
+import re
 from typing import Any, Optional
 
+from config import MAX_MANIM_VISUAL_DURATION_SECONDS
 from backend.services.model_router import get_model_config, llm_json
 from manim_renderer import (
     direct_manim_validation_error,
@@ -198,6 +201,156 @@ def _split_sentences(text: Any, limit: int = 4) -> list[str]:
     return [_trim_sentence(part, 180) for part in parts[:limit]]
 
 
+def _word_count(text: Any) -> int:
+    return len(re.findall(r"\b[\w'-]+\b", str(text or "")))
+
+
+def estimate_spoken_duration_seconds(text: Any) -> float:
+    """Estimate speech duration using ~140 words/minute."""
+    words = _word_count(text)
+    if words <= 0:
+        return 0.0
+    return round((words / 140.0) * 60.0, 2)
+
+
+def _target_visual_duration_seconds(estimated_spoken_duration: float) -> float:
+    if estimated_spoken_duration <= 0:
+        return 12.0
+    return round(max(8.0, min(float(MAX_MANIM_VISUAL_DURATION_SECONDS), estimated_spoken_duration)), 2)
+
+
+def _split_spoken_text_for_segments(text: Any, max_segments: int = 12) -> list[str]:
+    raw = _clean_spaces(text)
+    if not raw:
+        return []
+    candidates = [part.strip() for part in re.split(r"(?<=[.!?])\s+", raw) if part.strip()]
+    if not candidates:
+        words = raw.split()
+        candidates = [" ".join(words[index:index + 24]) for index in range(0, len(words), 24)]
+    expanded: list[str] = []
+    for candidate in candidates:
+        words = candidate.split()
+        if len(words) <= 32:
+            expanded.append(candidate)
+            continue
+        expanded.extend(" ".join(words[index:index + 24]) for index in range(0, len(words), 24))
+    if len(expanded) <= max_segments:
+        return expanded
+    group_size = math.ceil(len(expanded) / max_segments)
+    grouped = [" ".join(expanded[index:index + group_size]) for index in range(0, len(expanded), group_size)]
+    return grouped[:max_segments]
+
+
+def _scale_durations_to_target(durations: list[float], target_duration: float) -> list[float]:
+    if not durations:
+        return []
+    total = sum(max(0.1, value) for value in durations)
+    if total <= 0:
+        return [round(target_duration / len(durations), 2) for _ in durations]
+    scale = target_duration / total
+    scaled = [max(2.4, value * scale) for value in durations]
+    scaled_total = sum(scaled)
+    if scaled_total > target_duration and scaled_total > 0:
+        shrink = target_duration / scaled_total
+        scaled = [max(1.4, value * shrink) for value in scaled]
+    return [round(value, 2) for value in scaled]
+
+
+def _normalize_spoken_segments(raw_segments: Any, spoken_answer: str) -> list[dict[str, Any]]:
+    segments: list[dict[str, Any]] = []
+    if isinstance(raw_segments, list):
+        for index, item in enumerate(raw_segments, start=1):
+            if not isinstance(item, dict):
+                continue
+            text = _clean_spaces(item.get("text") or item.get("spoken_text") or item.get("speechText"))
+            if not text:
+                continue
+            duration = _safe_float(
+                item.get("estimated_duration_seconds") or item.get("duration_seconds") or item.get("duration"),
+                estimate_spoken_duration_seconds(text),
+            )
+            segments.append(
+                {
+                    "id": _clean_spaces(item.get("id")) or f"seg_{index}",
+                    "text": text,
+                    "estimated_duration_seconds": max(1.4, duration),
+                    "matching_visual_step_id": _clean_spaces(item.get("matching_visual_step_id") or item.get("matchingVisualStepId")) or f"vis_{index}",
+                }
+            )
+    answer_words = _word_count(spoken_answer)
+    segment_words = sum(_word_count(segment.get("text")) for segment in segments)
+    if segments and answer_words >= 40 and segment_words < answer_words * 0.75:
+        logger.warning(
+            "[av-sync] spoken_segments covered too little of spoken_answer; rebuilding segments answer_words=%s segment_words=%s",
+            answer_words,
+            segment_words,
+        )
+        segments = []
+    if not segments:
+        chunks = _split_spoken_text_for_segments(spoken_answer)
+        for index, text in enumerate(chunks, start=1):
+            segments.append(
+                {
+                    "id": f"seg_{index}",
+                    "text": text,
+                    "estimated_duration_seconds": max(2.4, estimate_spoken_duration_seconds(text)),
+                    "matching_visual_step_id": f"vis_{index}",
+                }
+            )
+    estimated_total = estimate_spoken_duration_seconds(spoken_answer)
+    target = _target_visual_duration_seconds(estimated_total)
+    durations = _scale_durations_to_target([segment["estimated_duration_seconds"] for segment in segments], target)
+    cursor = 0.0
+    for index, segment in enumerate(segments):
+        duration = durations[index] if index < len(durations) else segment["estimated_duration_seconds"]
+        segment["estimated_duration_seconds"] = round(duration, 2)
+        segment["start"] = round(cursor, 2)
+        segment["end"] = round(cursor + duration, 2)
+        cursor += duration
+    return segments
+
+
+def _normalize_visual_steps(raw_steps: Any, spoken_segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    raw_items = raw_steps if isinstance(raw_steps, list) else []
+    total = max(len(spoken_segments), len(raw_items))
+    regions = ["left", "right", "bottom", "left", "right"]
+    steps: list[dict[str, Any]] = []
+    for index in range(total):
+        raw = raw_items[index] if index < len(raw_items) and isinstance(raw_items[index], dict) else {}
+        speech = spoken_segments[min(index, len(spoken_segments) - 1)] if spoken_segments else {}
+        step_id = _clean_spaces(raw.get("id")) or _clean_spaces(speech.get("matching_visual_step_id")) or f"vis_{index + 1}"
+        description = _clean_spaces(raw.get("description") or raw.get("cue") or raw.get("visualCue") or raw.get("matches_spoken_text"))
+        if not description:
+            description = _trim_sentence(speech.get("text") or f"Visual step {index + 1}", 120)
+        duration = _safe_float(raw.get("duration_seconds") or raw.get("duration") or raw.get("estimated_duration_seconds"), speech.get("estimated_duration_seconds") or 3.0)
+        start = _safe_float(raw.get("start"), speech.get("start") or sum(step["duration_seconds"] for step in steps))
+        end = _safe_float(raw.get("end"), start + duration)
+        if end <= start:
+            end = start + duration
+        duration = max(1.4, end - start)
+        steps.append(
+            {
+                "id": step_id,
+                "description": description,
+                "duration_seconds": round(duration, 2),
+                "region": _clean_spaces(raw.get("region")) or regions[index % len(regions)],
+                "matching_spoken_segment_id": _clean_spaces(raw.get("matching_spoken_segment_id") or raw.get("matchesSpeechSegmentId")) or speech.get("id") or f"seg_{index + 1}",
+                "start": round(start, 2),
+                "end": round(start + duration, 2),
+            }
+        )
+    target = sum(segment.get("estimated_duration_seconds", 0.0) for segment in spoken_segments)
+    durations = _scale_durations_to_target([step["duration_seconds"] for step in steps], target) if target > 0 else []
+    cursor = 0.0
+    for index, step in enumerate(steps):
+        duration = durations[index] if index < len(durations) else step["duration_seconds"]
+        step["duration_seconds"] = round(duration, 2)
+        step["start"] = round(cursor, 2)
+        step["end"] = round(cursor + duration, 2)
+        cursor += duration
+    return steps
+
+
 _VIDEO_CONTEXT_SYSTEM = """You are teaching as the given teacher persona, answering a student inside an immersive lesson.
 
 Use the CURRENT VIDEO PART as the primary source of facts. Stay in the teacher's voice (the persona prompt). Be conversational and suited to voice output (no markdown). If the student asks for exam help, include the key equations, common question types, and things to remember. If a visualization would help, request it via visualNeeded/visualType/visualPrompt.
@@ -345,6 +498,23 @@ The student is learning from a teacher persona. Preserve the teacher's style.
 The output must be valid JSON only and must use this shape:
 {
   "spoken_answer": "voice-friendly answer",
+  "spoken_segments": [
+    {
+      "id": "seg_1",
+      "text": "one spoken segment",
+      "estimated_duration_seconds": 8,
+      "matching_visual_step_id": "vis_1"
+    }
+  ],
+  "visual_steps": [
+    {
+      "id": "vis_1",
+      "description": "what appears or changes on screen",
+      "duration_seconds": 8,
+      "region": "left|right|title|bottom"
+    }
+  ],
+  "estimated_total_visual_duration_seconds": 60,
   "teaching_state_update": {
     "current_topic": "string",
     "current_step": "string",
@@ -364,6 +534,21 @@ The output must be valid JSON only and must use this shape:
   "manim_code": "full Python file defining class GeneratedScene(Scene)",
   "follow_up_question": "string"
 }
+
+Duration and coverage rules:
+- Keep spoken_answer around 45-70 seconds when possible. End with a brief follow-up question outside the answer field.
+- The Manim animation must cover the entire spoken_answer, not just the introduction.
+- If spoken_answer explains 6 steps, the Manim scene must show 6 visual steps.
+- Do not stop after the first 20 seconds.
+- Use waits and step-by-step transitions so the final MP4 duration is close to the spoken answer duration.
+- Estimate spoken duration at about 140 words per minute.
+- Target visual duration is the estimated spoken duration, capped at 90 seconds.
+- Minimum acceptable visual duration is 75% of the estimated spoken duration.
+- Every spoken segment must have a matching visual step.
+- visual_steps count must be >= spoken_segments count.
+- Sum of visual_steps durations should be close to total spoken duration.
+- Manim code must implement every visual_step in order.
+- Each spoken segment must correspond to a Manim animation or visual state.
 
 The visual must be interactive and explanatory, not a static board.
 Use step-by-step animations:
@@ -392,8 +577,8 @@ Manim code rules:
 - use built-in colors only
 - avoid MathTex/Tex unless LaTeX is available
 - use Text for equations if LaTeX unavailable
-- keep runtime short
-- prefer 3-6 meaningful animations over long complicated scenes
+- keep runtime at or below 90 seconds
+- prefer one clear animation/state per spoken segment over a short intro-only scene
 - use progressive animation, not a static board
 
 Allowed primitives:
@@ -443,6 +628,8 @@ Rules:
 - use only built-in color constants: WHITE, BLACK, BLUE, BLUE_E, GREEN, GREEN_E, RED, RED_E, YELLOW, ORANGE, PURPLE, GREY, GRAY
 - keep all objects inside a 16:9 frame
 - keep the scene simple and reliable
+- if repairing visual_too_short_for_spoken_answer, extend timing/waits and implement every visual step instead of returning an intro-only scene
+- keep total visual duration at or below 90 seconds
 """
 
 
@@ -715,6 +902,10 @@ Rules:
 - Use SESSION_MEMORY_JSON to continue the current step and next teaching goal.
 - Use the previous answer and current reply block above as the continuity anchor.
 - visual_plan_with_timestamps must align with the spoken answer.
+- spoken_segments and visual_steps must cover the full answer from beginning to end.
+- Estimate the spoken answer duration at 140 words per minute, then set estimated_total_visual_duration_seconds.
+- The Manim code must implement every visual_step in order and target the estimated spoken duration, capped at 90 seconds.
+- Do not make a 20 second animation for a 60-80 second spoken answer.
 - Visual should be Manim-based.
 - Avoid static board-like visuals.
 - Prefer animation: moving arrows, highlighting, progressive reveal, transformations, step-by-step diagrams.
@@ -727,16 +918,36 @@ Return JSON only in the required shape from the system prompt.
 """.strip()
 
 
-def _fallback_combined_manim_code(*, title: str, topic: str, speech_segments: list[dict[str, Any]], visual_segments: list[dict[str, Any]]) -> str:
+def _fallback_combined_manim_code(
+    *,
+    title: str,
+    topic: str,
+    speech_segments: list[dict[str, Any]],
+    visual_segments: list[dict[str, Any]],
+    target_duration_seconds: float | None = None,
+) -> str:
     title_literal = json.dumps(_trim_sentence(title or topic or "Visual explanation", 46))
     topic_literal = json.dumps(_trim_sentence(topic or "core idea", 54))
-    labels = []
-    for item in visual_segments[:4]:
-        labels.append(_trim_sentence(item.get("description") or item.get("text") or item.get("cue") or "Next step", 42))
-    if not labels:
-        labels = [_trim_sentence(item.get("text"), 42) for item in speech_segments[:4] if _clean_spaces(item.get("text"))]
-    labels = [label for label in labels if label][:4] or ["Start with the main idea", "Watch the change", "Connect cause to effect"]
-    labels_literal = json.dumps(labels)
+    steps = []
+    count = max(len(speech_segments), len(visual_segments), 1)
+    total_target = target_duration_seconds or sum(_safe_float(item.get("estimated_duration_seconds"), 0.0) for item in speech_segments) or 12.0
+    total_target = _target_visual_duration_seconds(total_target)
+    base_durations = []
+    for index in range(count):
+        speech = speech_segments[min(index, len(speech_segments) - 1)] if speech_segments else {}
+        visual = visual_segments[min(index, len(visual_segments) - 1)] if visual_segments else {}
+        label = _trim_sentence(
+            visual.get("description") or visual.get("text") or visual.get("cue") or speech.get("text") or "Next step",
+            54,
+        )
+        speech_text = _trim_sentence(speech.get("text") or label, 86)
+        duration = _safe_float(visual.get("duration_seconds") or speech.get("estimated_duration_seconds"), estimate_spoken_duration_seconds(speech_text) or 4.0)
+        base_durations.append(max(2.4, duration))
+        steps.append({"label": label, "speech": speech_text, "duration": duration})
+    durations = _scale_durations_to_target(base_durations, total_target)
+    for index, duration in enumerate(durations):
+        steps[index]["duration"] = duration
+    steps_literal = json.dumps(steps)
     return f'''from manim import *
 
 {_MANIM_REGION_HELPERS_CODE}
@@ -749,68 +960,41 @@ class {MANIM_SCENE_CLASS_NAME}(Scene):
         place_title(title)
         replace_region(self, active_regions, "title", title)
 
-        labels = {labels_literal}
-        left_panel = bullet_list([labels[0], {topic_literal}], max_width=5.2, font_size=25)
-        place_left(left_panel)
-        replace_region(self, active_regions, "left", left_panel)
+        steps = {steps_literal}
+        topic_label = {topic_literal}
+        for index, step in enumerate(steps):
+            label = step.get("label") or "Next step"
+            speech = step.get("speech") or label
+            duration = max(2.4, float(step.get("duration") or 4.0))
+            progress = safe_text(f"Step {{index + 1}} of {{len(steps)}}", font_size=22, max_width=11.5)
+            place_bottom(progress)
+            replace_region(self, active_regions, "bottom", progress)
 
-        start = Circle(radius=0.42, color=BLUE)
-        change = Rectangle(width=1.35, height=0.76, color=GREEN)
-        result = Circle(radius=0.42, color=ORANGE)
-        flow = VGroup(start, change, result).arrange(RIGHT, buff=0.75)
-        arrows = VGroup(
-            Arrow(start.get_right(), change.get_left(), buff=0.12, color=BLUE),
-            Arrow(change.get_right(), result.get_left(), buff=0.12, color=BLUE),
-        )
-        diagram = VGroup(flow, arrows)
-        place_right(diagram)
-        replace_region(self, active_regions, "right", diagram)
+            left_items = [label, speech]
+            if index == 0:
+                left_items.append(topic_label)
+            left_panel = bullet_list(left_items[:3], max_width=5.25, font_size=24)
+            place_left(left_panel)
+            replace_region(self, active_regions, "left", left_panel)
 
-        caption = safe_text(labels[0], font_size=24, max_width=11.5)
-        place_bottom(caption)
-        replace_region(self, active_regions, "bottom", caption)
+            dot = Circle(radius=0.38, color=BLUE)
+            bridge = Rectangle(width=1.18, height=0.68, color=YELLOW if index % 2 else GREEN)
+            result = Circle(radius=0.38, color=ORANGE)
+            flow = VGroup(dot, bridge, result).arrange(RIGHT, buff=0.72)
+            arrows = VGroup(
+                Arrow(dot.get_right(), bridge.get_left(), buff=0.12, color=BLUE),
+                Arrow(bridge.get_right(), result.get_left(), buff=0.12, color=BLUE),
+            )
+            diagram_title = safe_text(label, font_size=24, max_width=5.1)
+            diagram = VGroup(diagram_title, VGroup(flow, arrows)).arrange(DOWN, buff=0.35)
+            place_right(diagram)
+            replace_region(self, active_regions, "right", diagram)
+            self.wait(max(0.4, duration - 2.0))
 
-        step_diagram = VGroup(
-            Circle(radius=0.42, color=BLUE),
-            Rectangle(width=1.35, height=0.76, color=YELLOW),
-            Circle(radius=0.42, color=ORANGE),
-        ).arrange(RIGHT, buff=0.75)
-        step_arrows = VGroup(
-            Arrow(step_diagram[0].get_right(), step_diagram[1].get_left(), buff=0.12, color=BLUE),
-            Arrow(step_diagram[1].get_right(), step_diagram[2].get_left(), buff=0.12, color=BLUE),
-        )
-        step_group = VGroup(step_diagram, step_arrows)
-        place_right(step_group)
-        replace_region(self, active_regions, "right", step_group)
-        next_left = bullet_list(labels[:3], max_width=5.2, font_size=25)
-        place_left(next_left)
-        replace_region(self, active_regions, "left", next_left)
-
-        if len(labels) > 1:
-            next_caption = safe_text(labels[1], font_size=24, max_width=11.5)
-            place_bottom(next_caption)
-            replace_region(self, active_regions, "bottom", next_caption)
-        final_diagram = VGroup(
-            Circle(radius=0.42, color=BLUE),
-            Rectangle(width=1.35, height=0.76, color=GREEN),
-            Circle(radius=0.42, color=YELLOW),
-        ).arrange(RIGHT, buff=0.75)
-        final_arrows = VGroup(
-            Arrow(final_diagram[0].get_right(), final_diagram[1].get_left(), buff=0.12, color=BLUE),
-            Arrow(final_diagram[1].get_right(), final_diagram[2].get_left(), buff=0.12, color=BLUE),
-        )
-        final_group = VGroup(final_diagram, final_arrows)
-        place_right(final_group)
-        replace_region(self, active_regions, "right", final_group)
-        if len(labels) > 2:
-            final_caption = safe_text(labels[2], font_size=24, max_width=11.5)
-            place_bottom(final_caption)
-            replace_region(self, active_regions, "bottom", final_caption)
-        if len(labels) > 3:
-            takeaway = safe_text(labels[3], font_size=24, max_width=11.5)
-            place_bottom(takeaway)
-            replace_region(self, active_regions, "bottom", takeaway)
-        self.wait(1.0)
+        takeaway = safe_text("Pause here: connect each step back to the main idea.", font_size=24, max_width=11.5)
+        place_bottom(takeaway)
+        replace_region(self, active_regions, "bottom", takeaway)
+        self.wait(0.8)
 '''
 
 
@@ -841,16 +1025,27 @@ def _fallback_combined_response(
     cursor = 0.0
     speech_segments = []
     for index, text in enumerate(spoken_parts, start=1):
-        duration = max(3.0, min(5.5, len(text.split()) / 2.8))
-        speech_segments.append({"id": f"seg_{index}", "start": round(cursor, 1), "end": round(cursor + duration, 1), "text": text})
+        duration = max(3.0, estimate_spoken_duration_seconds(text))
+        speech_segments.append(
+            {
+                "id": f"seg_{index}",
+                "start": round(cursor, 1),
+                "end": round(cursor + duration, 1),
+                "text": text,
+                "estimated_duration_seconds": round(duration, 2),
+                "matching_visual_step_id": f"vis_{index}",
+            }
+        )
         cursor += duration
     visual_segments = [
         {
             "id": f"vis_{index}",
             "start": item["start"],
             "end": item["end"],
-            "matchesSpeechSegmentId": item["id"],
+            "duration_seconds": round(item["end"] - item["start"], 2),
+            "matching_spoken_segment_id": item["id"],
             "description": desc,
+            "region": "left" if index % 2 else "right",
         }
         for index, (item, desc) in enumerate(
             zip(
@@ -861,20 +1056,25 @@ def _fallback_combined_response(
         )
     ]
     speech_text = " ".join(item["text"] for item in speech_segments)
+    estimated_spoken = estimate_spoken_duration_seconds(speech_text)
+    target_visual = _target_visual_duration_seconds(estimated_spoken)
     return {
-        "speech": {"text": speech_text, "segments": speech_segments, "timestamps": speech_segments},
+        "speech": {"text": speech_text, "segments": speech_segments, "timestamps": speech_segments, "estimated_duration_seconds": estimated_spoken},
         "visual": {
             "visualNeeded": True,
             "visualType": "manim",
             "style": "interactive_teacher_visual",
             "segments": visual_segments,
+            "visual_steps": visual_segments,
             "timestamps": [{"start": item["start"], "end": item["end"], "cue": item["description"]} for item in visual_segments],
             "manimCode": _fallback_combined_manim_code(
                 title=title,
                 topic=topic,
                 speech_segments=speech_segments,
                 visual_segments=visual_segments,
+                target_duration_seconds=target_visual,
             ),
+            "estimatedTotalVisualDurationSeconds": target_visual,
         },
         "syncPlan": {
             "segments": [
@@ -888,6 +1088,10 @@ def _fallback_combined_response(
         },
         "teachingControl": {"askFollowUp": CLARIFICATION_FOLLOWUP, "nextAction": "await_student_response"},
         "askFollowUp": CLARIFICATION_FOLLOWUP,
+        "spoken_segments": speech_segments,
+        "visual_steps": visual_segments,
+        "estimated_spoken_duration_seconds": estimated_spoken,
+        "estimated_total_visual_duration_seconds": target_visual,
         "debug": {"source": "local_combined_fallback", "mode": mode},
     }
 
@@ -895,31 +1099,19 @@ def _fallback_combined_response(
 def _normalize_combined_speech(raw_speech: Any, *, fallback_text: str) -> dict[str, Any]:
     speech = raw_speech if isinstance(raw_speech, dict) else {}
     text = _clean_spaces(speech.get("text") or fallback_text)
-    raw_segments = speech.get("segments") if isinstance(speech.get("segments"), list) else speech.get("timestamps")
-    segments = []
-    cursor = 0.0
-    for index, item in enumerate(raw_segments or [], start=1):
-        if not isinstance(item, dict):
-            continue
-        seg_text = _clean_spaces(item.get("text")) or _trim_sentence(text, 180)
-        if not seg_text:
-            continue
-        start = _safe_float(item.get("start"), cursor)
-        end = _safe_float(item.get("end"), start + max(3.0, min(5.5, len(seg_text.split()) / 2.8)))
-        if end <= start:
-            end = start + 3.5
-        cursor = end
-        segments.append({"id": _clean_spaces(item.get("id")) or f"seg_{index}", "start": round(start, 2), "end": round(end, 2), "text": seg_text})
-    if not segments:
-        parts = _split_sentences(text, 4) or [fallback_text]
-        cursor = 0.0
-        for index, part_text in enumerate(parts, start=1):
-            duration = max(3.0, min(5.5, len(part_text.split()) / 2.8))
-            segments.append({"id": f"seg_{index}", "start": round(cursor, 2), "end": round(cursor + duration, 2), "text": part_text})
-            cursor += duration
+    raw_segments = speech.get("spoken_segments") if isinstance(speech.get("spoken_segments"), list) else speech.get("spokenSegments")
+    if not isinstance(raw_segments, list):
+        raw_segments = speech.get("segments") if isinstance(speech.get("segments"), list) else speech.get("timestamps")
+    segments = _normalize_spoken_segments(raw_segments, text or fallback_text)
     if not text:
         text = " ".join(item["text"] for item in segments)
-    return {"text": text, "segments": segments, "timestamps": segments}
+    return {
+        "text": text,
+        "segments": segments,
+        "timestamps": segments,
+        "word_count": _word_count(text),
+        "estimated_duration_seconds": estimate_spoken_duration_seconds(text),
+    }
 
 
 def _normalize_visual_plan_item(raw_item: dict[str, Any], *, index: int, speech: dict[str, Any]) -> dict[str, Any]:
@@ -940,51 +1132,56 @@ def _normalize_visual_plan_item(raw_item: dict[str, Any], *, index: int, speech:
 def _coerce_unified_teaching_payload(parsed: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         return {}
-    if not any(key in parsed for key in ("spoken_answer", "teaching_state_update", "visual_plan_with_timestamps", "manim_code", "follow_up_question")):
+    if not any(key in parsed for key in ("spoken_answer", "spoken_segments", "visual_steps", "teaching_state_update", "visual_plan_with_timestamps", "manim_code", "follow_up_question")):
         return parsed
     spoken_answer = _clean_spaces(parsed.get("spoken_answer") or parsed.get("spokenAnswer"))
-    visual_plan = parsed.get("visual_plan_with_timestamps")
+    raw_spoken_segments = parsed.get("spoken_segments") if isinstance(parsed.get("spoken_segments"), list) else parsed.get("spokenSegments")
+    speech_segments = _normalize_spoken_segments(raw_spoken_segments, spoken_answer)
+    visual_plan = parsed.get("visual_steps") if isinstance(parsed.get("visual_steps"), list) else parsed.get("visualSteps")
+    if not isinstance(visual_plan, list):
+        visual_plan = parsed.get("visual_plan_with_timestamps")
     if not isinstance(visual_plan, list):
         visual_plan = parsed.get("visualPlanWithTimestamps") if isinstance(parsed.get("visualPlanWithTimestamps"), list) else []
-    speech_segments = []
-    cursor = 0.0
-    speech_parts = _split_sentences(spoken_answer, max(1, min(6, len(visual_plan) or 4))) or ([spoken_answer] if spoken_answer else [])
-    for index, part_text in enumerate(speech_parts, start=1):
-        raw_visual = visual_plan[index - 1] if index - 1 < len(visual_plan) and isinstance(visual_plan[index - 1], dict) else {}
-        start = _safe_float(raw_visual.get("start"), cursor)
-        end = _safe_float(raw_visual.get("end"), start + max(3.0, min(5.5, len(part_text.split()) / 2.8)))
-        if end <= start:
-            end = start + 3.0
-        speech_segments.append({"id": f"seg_{index}", "start": round(start, 2), "end": round(end, 2), "text": part_text})
-        cursor = end
-    visual_segments = [
-        _normalize_visual_plan_item(item if isinstance(item, dict) else {}, index=index, speech=speech_segments[min(index - 1, len(speech_segments) - 1)] if speech_segments else {"id": f"seg_{index}", "start": 0.0, "end": 3.0})
-        for index, item in enumerate(visual_plan or [], start=1)
-    ]
+    visual_segments = _normalize_visual_steps(visual_plan, speech_segments)
+    estimated_spoken = estimate_spoken_duration_seconds(spoken_answer)
+    target_visual = _target_visual_duration_seconds(estimated_spoken)
     return {
-        "speech": {"text": spoken_answer, "segments": speech_segments},
+        "speech": {
+            "text": spoken_answer,
+            "segments": speech_segments,
+            "spoken_segments": speech_segments,
+            "word_count": _word_count(spoken_answer),
+            "estimated_duration_seconds": estimated_spoken,
+        },
         "visual": {
             "visualNeeded": True,
             "visualType": "manim",
             "segments": visual_segments,
+            "visual_steps": visual_segments,
             "manimCode": str(parsed.get("manim_code") or parsed.get("manimCode") or "").strip(),
+            "estimatedTotalVisualDurationSeconds": _safe_float(parsed.get("estimated_total_visual_duration_seconds") or parsed.get("estimatedTotalVisualDurationSeconds"), target_visual),
         },
         "teachingControl": {
             "askFollowUp": _clean_spaces(parsed.get("follow_up_question") or parsed.get("followUpQuestion") or CLARIFICATION_FOLLOWUP),
             "nextAction": _clean_spaces((parsed.get("teaching_state_update") or {}).get("next_action") if isinstance(parsed.get("teaching_state_update"), dict) else "") or "await_student_response",
         },
         "teachingStateUpdate": parsed.get("teaching_state_update") if isinstance(parsed.get("teaching_state_update"), dict) else {},
-        "debug": {"raw_schema": "unified_structured_v1"},
+        "debug": {
+            "raw_schema": "unified_structured_v2",
+            "spoken_segments": len(speech_segments),
+            "visual_steps": len(visual_segments),
+            "estimated_spoken_duration_seconds": estimated_spoken,
+            "estimated_total_visual_duration_seconds": target_visual,
+        },
     }
 
 
 def _normalize_combined_visual(raw_visual: Any, *, speech_segments: list[dict[str, Any]], fallback_code: str) -> dict[str, Any]:
     visual = raw_visual if isinstance(raw_visual, dict) else {}
-    raw_segments = visual.get("segments") if isinstance(visual.get("segments"), list) else visual.get("timestamps")
-    segments = []
-    for index, speech in enumerate(speech_segments, start=1):
-        raw_item = raw_segments[index - 1] if isinstance(raw_segments, list) and index - 1 < len(raw_segments) and isinstance(raw_segments[index - 1], dict) else {}
-        segments.append(_normalize_visual_plan_item(raw_item, index=index, speech=speech))
+    raw_segments = visual.get("visual_steps") if isinstance(visual.get("visual_steps"), list) else visual.get("visualSteps")
+    if not isinstance(raw_segments, list):
+        raw_segments = visual.get("segments") if isinstance(visual.get("segments"), list) else visual.get("timestamps")
+    segments = _normalize_visual_steps(raw_segments, speech_segments)
     code = str(visual.get("manimCode") or visual.get("code") or "").strip()
     code_source = "ai_generated" if code else "local_fallback"
     validation_error = direct_manim_validation_error(code) if code else "empty Manim code"
@@ -998,11 +1195,13 @@ def _normalize_combined_visual(raw_visual: Any, *, speech_segments: list[dict[st
         "visualType": "manim",
         "style": _clean_spaces(visual.get("style")) or "interactive_teacher_visual",
         "segments": segments,
+        "visual_steps": segments,
         "timestamps": [{"start": item["start"], "end": item["end"], "cue": item["description"]} for item in segments],
         "manimCode": code,
         "manimPlan": visual.get("manimPlan") or "",
         "manimCodeSource": code_source,
         "manimCodeValidationError": validation_error,
+        "estimatedTotalVisualDurationSeconds": round(sum(item.get("duration_seconds", 0.0) for item in segments), 2),
     }
 
 
@@ -1026,6 +1225,7 @@ def _normalize_combined_teaching_response(
         topic=topic,
         speech_segments=speech["segments"],
         visual_segments=(fallback.get("visual") or {}).get("segments") or [],
+        target_duration_seconds=_target_visual_duration_seconds(speech.get("estimated_duration_seconds") or estimate_spoken_duration_seconds(speech["text"])),
     )
     visual = _normalize_combined_visual(parsed.get("visual"), speech_segments=speech["segments"], fallback_code=fallback_code)
     control = parsed.get("teachingControl") if isinstance(parsed.get("teachingControl"), dict) else {}
@@ -1046,11 +1246,17 @@ def _normalize_combined_teaching_response(
         "next_teaching_goal": _clean_spaces(state_update.get("next_teaching_goal") or ask_follow_up),
     }
     raw_debug = parsed.get("debug") if isinstance(parsed.get("debug"), dict) else {}
+    estimated_spoken = estimate_spoken_duration_seconds(speech["text"])
+    estimated_visual = round(sum(item.get("duration_seconds", 0.0) for item in visual.get("segments") or []), 2)
     return {
         "speech": speech,
         "visual": visual,
         "teachingStateUpdate": state_update,
         "visualPlanWithTimestamps": visual.get("segments") or [],
+        "spoken_segments": speech.get("segments") or [],
+        "visual_steps": visual.get("segments") or [],
+        "estimated_spoken_duration_seconds": estimated_spoken,
+        "estimated_total_visual_duration_seconds": estimated_visual or _target_visual_duration_seconds(estimated_spoken),
         "spoken_answer": speech["text"],
         "manim_code": visual.get("manimCode") or "",
         "follow_up_question": ask_follow_up,
@@ -1066,7 +1272,16 @@ def _normalize_combined_teaching_response(
         },
         "teachingControl": {"askFollowUp": ask_follow_up, "nextAction": next_action},
         "askFollowUp": ask_follow_up,
-        "debug": {**raw_debug, "source": "combined_teaching_pipeline", "mode": mode},
+        "debug": {
+            **raw_debug,
+            "source": "combined_teaching_pipeline",
+            "mode": mode,
+            "word_count": _word_count(speech["text"]),
+            "estimated_spoken_duration_seconds": estimated_spoken,
+            "estimated_total_visual_duration_seconds": estimated_visual or _target_visual_duration_seconds(estimated_spoken),
+            "speech_segment_count": len(speech.get("segments") or []),
+            "visual_step_count": len(visual.get("segments") or []),
+        },
     }
 
 
@@ -1147,7 +1362,7 @@ async def generate_teaching_response_with_visuals(
             "model_provider": cfg.provider,
             "model": cfg.model,
             "model_source": cfg.source,
-            "structured_response_schema": "spoken_answer_teaching_state_visual_plan_manim_code_v1",
+            "structured_response_schema": "spoken_segments_visual_steps_manim_code_v2",
             "openai_used": bool(cfg.provider == "openai" and raw),
             "llm_response_received": bool(raw),
             "manim_code_source": (normalized.get("visual") or {}).get("manimCodeSource") or "unknown",
@@ -1156,6 +1371,13 @@ async def generate_teaching_response_with_visuals(
         }
     )
     normalized["debug"] = debug
+    logger.info(
+        "[av-sync] word_count=%s estimated_spoken_duration=%s visual_steps=%s spoken_segments=%s result=planned",
+        debug.get("word_count"),
+        debug.get("estimated_spoken_duration_seconds"),
+        debug.get("visual_step_count"),
+        debug.get("speech_segment_count"),
+    )
     logger.info(
         "[teaching-pipeline] response has speech=%s visual=%s manimCode=%s manim_source=%s openai_used=%s",
         bool((normalized.get("speech") or {}).get("text")),
@@ -1173,6 +1395,7 @@ def build_fallback_manim_code(
     topic: str,
     spoken_answer: str,
     visual_plan: list[dict[str, Any]] | None = None,
+    target_duration_seconds: float | None = None,
 ) -> str:
     speech = _normalize_combined_speech({"text": spoken_answer or title or topic}, fallback_text=spoken_answer or title or topic or "Visual explanation")
     visual_segments = []
@@ -1192,6 +1415,7 @@ def build_fallback_manim_code(
         topic=topic or title or "core idea",
         speech_segments=speech.get("segments") or [],
         visual_segments=visual_segments,
+        target_duration_seconds=target_duration_seconds or _target_visual_duration_seconds(estimate_spoken_duration_seconds(spoken_answer)),
     )
 
 
@@ -1201,6 +1425,10 @@ async def repair_manim_code_with_error(
     error_log: str,
     spoken_answer: str,
     visual_plan: list[dict[str, Any]] | None = None,
+    spoken_segments: list[dict[str, Any]] | None = None,
+    visual_steps: list[dict[str, Any]] | None = None,
+    estimated_spoken_duration_seconds: float | None = None,
+    actual_manim_duration_seconds: float | None = None,
     topic: str = "",
     title: str = "",
 ) -> dict[str, Any]:
@@ -1217,8 +1445,20 @@ Title:
 Spoken answer the visual must support:
 {spoken_answer}
 
+Spoken segments:
+{json.dumps(spoken_segments or [], ensure_ascii=False)}
+
 Visual plan with timestamps:
 {json.dumps(visual_plan or [], ensure_ascii=False)}
+
+Visual steps:
+{json.dumps(visual_steps or visual_plan or [], ensure_ascii=False)}
+
+Estimated spoken duration seconds:
+{estimated_spoken_duration_seconds if estimated_spoken_duration_seconds is not None else estimate_spoken_duration_seconds(spoken_answer)}
+
+Actual rendered Manim duration seconds, if already rendered:
+{actual_manim_duration_seconds if actual_manim_duration_seconds is not None else "not_rendered_yet"}
 
 Failed Manim code:
 {failed_code}
@@ -1228,6 +1468,8 @@ Full validation/render error log, including final stderr/stdout tails when avail
 
 Task:
 Repair the Manim code so it renders safely and still follows the same spoken answer and visual plan.
+If the error is visual_too_short_for_spoken_answer, rewrite or extend the scene so it covers every spoken segment and targets 75-100% of the estimated spoken duration, capped at 90 seconds.
+If the previous video was only about 20 seconds for a much longer explanation, do not merely patch syntax; rewrite the timing and waits to cover all spoken segments.
 Simplify the scene if the error came from animation complexity, mobject state, transform matching, or unsupported Manim behavior.
 Rewrite it using the region-based layout helpers. Preserve the educational idea and creative metaphor, but prevent cropped objects, overlapping objects, and stacked replacements.
 Before showing new content in an occupied region, call replace_region(self, active_regions, region_name, new_group) so the previous group fades out first.

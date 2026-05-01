@@ -964,6 +964,13 @@
     visualCleanupRequested = false;
 
     const status = visual.status || visual.renderStatus || 'pending';
+    if(visual.manim_duration_seconds || visual.estimated_spoken_duration_seconds){
+      flowLog('manim duration metadata', {
+        manimDuration: visual.manim_duration_seconds,
+        estimatedSpokenDuration: visual.estimated_spoken_duration_seconds,
+        ratio: visual.visual_to_audio_duration_ratio
+      });
+    }
     setManimSyncState('waiting_for_visual', {status});
     const rawUrl = visual.videoUrl
       || visual.media_url

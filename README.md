@@ -17,15 +17,6 @@ Teachers upload lesson videos. The backend transcribes them, updates one evolvin
 
 Old public video-first routes now redirect or are disabled. Backend video, transcription, roadmap, TTS, and Manim logic is preserved.
 
-## Dev Demo Accounts
-
-The dev seed runs on boot unless `PARALLEA_ENABLE_DEV_SEED=0` or `PARALLEA_ENV=production`.
-
-- Teacher: `teacher@example.com` / `password123`
-- Student: `student@example.com` / `password123`
-
-The seed includes a `Guitar Coach` persona at `per_demo_guitar_coach`, based on the guitar lesson demo, with one teacher video, one roadmap, and six roadmap parts.
-
 ## Environment
 
 Copy `.env.example` into your deployment platform or local shell.
@@ -46,7 +37,6 @@ Most important variables:
 Optional:
 
 - `ASSEMBLYAI_API_KEY` for remote upload transcription if you install `requirements.optional.txt`
-- `PARALLEA_ENABLE_DEV_SEED=0` to disable demo users/persona
 
 ## Install
 
@@ -111,20 +101,9 @@ These scripts verify that the active clarification/persona-only route returns ti
 
 Rendered Manim videos are served from `/rendered-scenes/manim/<hash>.mp4` by default, but the files are written outside the watched source tree. `MANIM_OUTPUT_DIR` and `MANIM_PUBLIC_BASE_URL` can override that path when needed.
 
-## Test The Guitar Persona
-
-1. Start the app.
-2. Log in as `student@example.com` / `password123`.
-3. Open `/student/personas`.
-4. Select `Guitar Coach`.
-5. Ask `I want to learn chords`.
-6. The topic router should enter `video_context` and load the matching guitar roadmap parts.
-7. Ask `jazz harmony`.
-8. The avatar should ask for confirmation before using `persona_only` mode.
-
 ## Deployment Notes
 
-- Use `PARALLEA_ENV=production` or `PARALLEA_ENABLE_DEV_SEED=0` in production.
+- Use `PARALLEA_ENV=production` in production.
 - The app is designed for same-origin hosting as a single FastAPI service.
 - Server-side TTS uses Edge TTS only. No local TTS model files are required.
 - Mount runtime storage in production if uploads, thumbnails, transcripts, audio, and generated renders must persist.

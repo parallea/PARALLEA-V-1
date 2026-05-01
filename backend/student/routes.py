@@ -153,12 +153,14 @@ def page_personas(request: Request):
 
 
 @router.get("/student/learn/{persona_id}", response_class=HTMLResponse)
-def page_learn(request: Request, persona_id: str):  # noqa: ARG001
+def page_learn(request: Request, persona_id: str):
     if not _gate_html(request):
         existing = current_user(request)
         if existing and existing.get("role") in {"teacher", "admin"}:
             return RedirectResponse("/teacher/dashboard")
         return RedirectResponse("/auth/login")
+    if not personas_repo.get(persona_id):
+        raise HTTPException(status_code=404, detail="persona not found")
     return _serve_page("learn")
 
 

@@ -53,36 +53,6 @@
     "updated_at": "2026-04-30T09:51:07.753687+00:00"
   },
   {
-    "id": "vid_demo_guitar_lesson_1",
-    "teacher_id": "usr_demo_guitar_teacher",
-    "persona_id": "per_demo_guitar_coach",
-    "title": "First Guitar Lesson",
-    "description": "Beginner lesson covering guitar types, parts, tuning, basic chords, and practice tips.",
-    "subject": "Guitar",
-    "creator_name": "Guitar Coach",
-    "creator_profession": "Guitar Teacher",
-    "filename": "",
-    "original_video_url": null,
-    "thumbnail_url": null,
-    "transcript": "Welcome to Lesson 1. First, choose the guitar that matches the one in your hands: steel acoustic, nylon acoustic, or electric. Then learn the main parts: bridge, neck, head, body, frets, and strings. Tune each string from low E to high E, listening for a steady center. Finish with three beginner chords: E minor, G major, and C major. Press just behind the frets, keep the thumb relaxed, strum slowly, and listen for clean ringing notes.",
-    "chunks_path": null,
-    "has_transcript": true,
-    "duration": 720,
-    "status": "ready",
-    "status_message": "dev seed persona + roadmap ready",
-    "detected_topics": [
-      "guitar basics",
-      "guitar parts",
-      "finger placement",
-      "basic chords",
-      "switching chords",
-      "strumming pattern",
-      "practice routine"
-    ],
-    "created_at": "2026-05-01T11:38:09.674544+00:00",
-    "updated_at": "2026-05-01T11:38:09.674554+00:00"
-  },
-  {
     "id": "3ac8f364",
     "teacher_id": "usr_1c15c93da5b4412a",
     "persona_id": "per_0746a728bc584fad",

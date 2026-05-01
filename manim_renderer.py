@@ -299,6 +299,41 @@ def path_to_public_url(file_path: Path) -> str:
         return f"{MANIM_PUBLIC_BASE_URL}/{Path(file_path).name}"
 
 
+def get_media_duration_seconds(path: str | Path) -> float | None:
+    source = Path(path)
+    if not source.exists() or not source.is_file():
+        return None
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        return None
+    try:
+        proc = subprocess.run(
+            [
+                ffprobe,
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(source),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=12,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if proc.returncode != 0:
+            logger.warning("[av-sync] ffprobe duration failed path=%s returncode=%s stderr=%s", source, proc.returncode, (proc.stderr or "")[-500:])
+            return None
+        duration = float((proc.stdout or "").strip())
+        return duration if duration >= 0 else None
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[av-sync] ffprobe duration exception path=%s error=%s", source, exc)
+        return None
+
+
 def manim_storage_enabled() -> bool:
     return storage_enabled()
 
@@ -2096,6 +2131,7 @@ def run_manim_scene(
 
     final_video.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(rendered, final_video)
+    media_duration_seconds = get_media_duration_seconds(final_video)
     public_scene, public_log, public_meta = public_artifact_paths(final_video, key)
     shutil.copy2(scene_file, public_scene)
     write_text_file(
@@ -2128,6 +2164,7 @@ def run_manim_scene(
                 "render_log": str(public_log),
                 "command": command_text,
                 "render_time_sec": render_time_sec,
+                "media_duration_seconds": media_duration_seconds,
                 "used_fallback": used_fallback,
                 "storage": stored_object,
                 "latex_available": has_latex_available(),
@@ -2163,6 +2200,7 @@ def run_manim_scene(
         "stderr_path": debug_paths["stderr_path"],
         "debug_meta_path": debug_paths["meta_path"],
         "render_time_sec": render_time_sec,
+        "media_duration_seconds": media_duration_seconds,
         "cache_hit": False,
         "used_fallback": used_fallback,
         "storage": stored_object,
@@ -2207,6 +2245,7 @@ def render_manim_payload(
         scene_file, render_log, metadata_file = public_artifact_paths(final_video, key)
         cache_bust = int(final_video.stat().st_mtime)
         media_url = f"{path_to_public_url(final_video)}?v={cache_bust}"
+        media_duration_seconds = get_media_duration_seconds(final_video)
         logger.info("[manim] cache hit segment=%s frame=%s output=%s url=%s", segment_label, frame_number, final_video, media_url)
         return {
             "media_url": media_url,
@@ -2219,6 +2258,7 @@ def render_manim_payload(
             "used_fallback": (validation or {}).get("fallback_used", False),
             "cache_hit": True,
             "render_time_sec": 0.0,
+            "media_duration_seconds": media_duration_seconds,
             "payload": payload,
             "validation": validation,
             "layout_mode": payload.get("layout_mode"),

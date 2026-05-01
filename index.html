@@ -89,10 +89,6 @@ h1{margin:14px 0 18px;font-size:clamp(44px,7vw,82px);line-height:.95;letter-spac
 .why-item{display:grid;grid-template-columns:120px 1fr;gap:18px;align-items:start;border-bottom:1px solid var(--line);padding:0 0 16px}
 .why-item b{color:var(--blue)}
 .demo-card{display:grid;grid-template-columns:300px 1fr auto;gap:22px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:26px;padding:24px;box-shadow:var(--shadow)}
-.guitar-tile{min-height:210px;border-radius:22px;background:linear-gradient(135deg,#201915,#6d4326 58%,#1f3330);display:grid;place-items:center;color:#ffe5c6;position:relative;overflow:hidden}
-.guitar-tile .neck{width:18px;height:142px;border-radius:999px;background:#c99056;position:absolute;top:20px}
-.guitar-tile .body{width:118px;height:132px;border-radius:44% 44% 48% 48%;background:#d98b43;border:5px solid #4c2e1d;position:absolute;bottom:24px}
-.guitar-tile .hole{width:34px;height:34px;border-radius:50%;background:#2a1710;position:absolute;bottom:84px}
 .demo-copy h2{margin:0 0 8px;font-size:32px}
 .demo-copy p{margin:0;color:var(--muted);line-height:1.65}
 .demo-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
@@ -150,23 +146,23 @@ footer{border-top:1px solid var(--line);padding:28px 0;color:var(--muted)}
       </div>
       <aside class="persona-visual" aria-label="Teacher persona preview">
         <div class="avatar-row">
-          <div class="avatar">GC</div>
+          <div class="avatar">TP</div>
           <div>
-            <b>Guitar Coach</b>
-            <span>Guitar Teacher</span>
+            <b>Teacher Persona</b>
+            <span>Interactive lessons</span>
           </div>
         </div>
-        <div class="voice-line">"Let's slow it down. First get your fingers comfortable, then we will add rhythm."</div>
+        <div class="voice-line">"Let's slow it down. We will connect the idea to examples, then check what makes sense."</div>
         <div class="mini-grid">
-          <div class="mini"><b>1</b><span>Persona</span></div>
-          <div class="mini"><b>6</b><span>Parts</span></div>
-          <div class="mini"><b>7</b><span>Topics</span></div>
+          <div class="mini"><b>1</b><span>Teacher</span></div>
+          <div class="mini"><b>Roadmap</b><span>Parts</span></div>
+          <div class="mini"><b>Live</b><span>Doubts</span></div>
         </div>
         <div class="chips">
-          <span class="chip">chords</span>
-          <span class="chip">strumming</span>
-          <span class="chip">finger placement</span>
-          <span class="chip">practice routine</span>
+          <span class="chip">roadmaps</span>
+          <span class="chip">visual explanations</span>
+          <span class="chip">teacher style</span>
+          <span class="chip">step-by-step help</span>
         </div>
       </aside>
     </div>
@@ -242,33 +238,6 @@ footer{border-top:1px solid var(--line);padding:28px 0;color:var(--muted)}
     </div>
   </section>
 
-  <section class="section shell" id="demo">
-    <div class="section-head">
-      <div>
-        <div class="kicker">Demo persona</div>
-        <h2>Try the guitar teacher.</h2>
-      </div>
-      <p>The old guitar tutorial has been represented as a teacher persona with topics, one demo video entry, and a structured roadmap.</p>
-    </div>
-    <article class="demo-card">
-      <div class="guitar-tile" aria-hidden="true">
-        <div class="neck"></div>
-        <div class="body"></div>
-        <div class="hole"></div>
-      </div>
-      <div class="demo-copy">
-        <h2>Guitar Coach</h2>
-        <p>Friendly, practical, beginner-focused guitar teaching. Explains slowly with step-by-step practice around chords, rhythm, finger placement, and common beginner mistakes.</p>
-        <div class="demo-meta">
-          <span class="chip">guitar basics</span>
-          <span class="chip">basic chords</span>
-          <span class="chip">strumming pattern</span>
-          <span class="chip">practice tips</span>
-        </div>
-      </div>
-      <a class="btn teal" id="demoCta" href="/auth/login">Open demo</a>
-    </article>
-  </section>
 </main>
 
 <footer>
@@ -292,11 +261,9 @@ footer{border-top:1px solid var(--line);padding:28px 0;color:var(--muted)}
       var user = data && data.user;
       var primary = '/auth/signup';
       var secondary = '/auth/login';
-      var demo = '/auth/login';
       if(user && (user.role === 'teacher' || user.role === 'admin')){
         primary = '/teacher/dashboard';
         secondary = '/teacher/dashboard';
-        demo = '/teacher/dashboard';
         var login = document.getElementById('navLogin');
         var signup = document.getElementById('navSignup');
         if(login) login.textContent = 'Dashboard';
@@ -304,7 +271,6 @@ footer{border-top:1px solid var(--line);padding:28px 0;color:var(--muted)}
       } else if(user && user.role === 'student'){
         primary = '/student/personas';
         secondary = '/student/personas';
-        demo = '/student/learn/per_demo_guitar_coach';
         var login2 = document.getElementById('navLogin');
         var signup2 = document.getElementById('navSignup');
         if(login2) login2.textContent = 'Teachers';
@@ -312,7 +278,6 @@ footer{border-top:1px solid var(--line);padding:28px 0;color:var(--muted)}
       }
       setHref('primaryCta', primary);
       setHref('secondaryCta', secondary);
-      setHref('demoCta', demo);
       setHref('footerTeacher', user ? (user.role === 'teacher' || user.role === 'admin' ? '/teacher/dashboard' : '/student/personas') : '/auth/login');
       setHref('footerStudent', user && user.role === 'student' ? '/student/personas' : '/auth/login');
       setHref('navLogin', user ? secondary : '/auth/login');

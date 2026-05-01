@@ -9,7 +9,6 @@ This audit predates the latest hosting simplification work. For the current depl
 - App type: mixed FastAPI backend plus static HTML/CSS/vanilla JS frontend.
 - Framework detected: FastAPI on Python. This is not a Next.js, React build, or Vite app.
 - Primary purpose: turn uploaded lesson videos into a voice-driven tutoring experience with avatar selection, TTS playback, source-clip replay, and synchronized board visuals.
-- Secondary purpose: ship a built-in guided beginner guitar lesson (`/guitar-lesson-1`) that does not require an uploaded video.
 
 ## Current stack
 
@@ -86,7 +85,6 @@ This audit predates the latest hosting simplification work. For the current depl
 - `player.html`: video playback page before immersion mode.
 - `avatar-select.html`: avatar picker and voice preview page.
 - `learn.html`: main uploaded-video immersive learning UI.
-- `guitar-lesson-1.html`: standalone scripted guitar lesson UI.
 - `Dockerfile`: container packaging.
 - `requirements.txt`, `requirements.optional.txt`: Python dependencies.
 - `.env.example`: example env file, but it is stale relative to current code.
@@ -98,7 +96,6 @@ This audit predates the latest hosting simplification work. For the current depl
 - Main app object: `main.py`
 - Main landing route: `/`
 - Main uploaded-video learning route: `/learn`
-- Standalone scripted lesson route: `/guitar-lesson-1`
 
 ## Runtime and architecture
 
@@ -112,13 +109,6 @@ This audit predates the latest hosting simplification work. For the current depl
 6. `learn.html` calls `/set-avatar`, then `/greet`, then loops through microphone capture -> `/transcribe-question` -> `/chat`.
 7. `/chat` returns answer text, suggestions, board actions, visual payload, and optionally a "reference bridge" clip range.
 8. `learn.html` replays the relevant source clip from `/video/{video_id}`, then plays TTS audio from `/audio-response/{name}` and drives synchronized visuals on the board.
-
-### End-to-end flow for the built-in guitar lesson
-
-1. `guitar-lesson-1.html` contains all lesson structure client-side: step list, guitar types, tuning metadata, chord data, and per-section context.
-2. It still uses the same backend AI endpoints: `/greet`, `/chat`, `/transcribe-question`.
-3. Instead of video chunk retrieval, it sends structured lesson context such as `lesson_id`, `current_section_title`, `visible_metadata`, and `section_order`.
-4. Backend responds in "lesson mode" and produces short teacher-like responses plus TTS audio.
 
 ### State management
 
@@ -141,7 +131,6 @@ This audit predates the latest hosting simplification work. For the current depl
 - `GET /player`
 - `GET /avatar-select`
 - `GET /learn`
-- `GET /guitar-lesson-1`
 
 ### API / asset routes
 
@@ -181,13 +170,6 @@ This audit predates the latest hosting simplification work. For the current depl
 - Clip-aware tutoring that can replay relevant source moments before explanation
 - Synchronized board visuals driven by semantic scene payloads
 - Heuristic local teaching fallback when remote model calls fail
-- Built-in guitar lesson with:
-  - guitar type selection
-  - anatomy walkthrough
-  - live tuner using Web Audio + mic input
-  - three beginner chord diagrams
-  - live lesson-tutor voice mode
-
 ## APIs, services, and models used
 
 | Service / model | Where used | Purpose | Status |
@@ -210,7 +192,6 @@ This audit predates the latest hosting simplification work. For the current depl
 - `transcribe.py`: upload processing path.
 - `rag.py`: AI behavior, fallback logic, optional remote services.
 - `learn.html`: primary uploaded-video product UI.
-- `guitar-lesson-1.html`: second major product surface.
 - `Dockerfile`: current deployment packaging.
 - `.dockerignore`: currently affects deploy correctness in important ways.
 - `data/videos.json`: source of truth for indexed videos, but currently contains environment-specific absolute paths.
@@ -328,7 +309,7 @@ This audit predates the latest hosting simplification work. For the current depl
 - Add a persistent volume and point `PARALLEA_DATA_DIR`, `PARALLEA_UPLOADS_DIR`, `PARALLEA_THUMBNAILS_DIR`, and `PARALLEA_AUDIO_DIR` to that volume.
 - Keep `PARALLEA_ENABLE_EDGE_TTS_FALLBACK=true` for the first deploy unless you mount Kokoro model files.
 - Use managed secrets on the host instead of shipping `.env`.
-- Prefer HTTPS-enabled hosting because microphone features and the guitar tuner depend on secure browser contexts.
+- Prefer HTTPS-enabled hosting because microphone features depend on secure browser contexts.
 
 ## Deployment blockers
 
@@ -357,8 +338,7 @@ This audit predates the latest hosting simplification work. For the current depl
 ### Medium-risk blockers / sharp edges
 
 - Browser microphone features require HTTPS or localhost.
-  - `guitar-lesson-1.html` explicitly checks for secure context before tuner capture.
-  - `learn.html` and `guitar-lesson-1.html` both depend on `getUserMedia`, `MediaRecorder`, and `AudioContext`.
+  - `learn.html` depends on `getUserMedia`, `MediaRecorder`, and `AudioContext`.
 
 - Optional retrieval path is incomplete.
   - `main.py` and `rag.py` reference `vectorstore`, but `vectorstore.py` is not in this repo.
@@ -417,8 +397,7 @@ This audit predates the latest hosting simplification work. For the current depl
    - start from an empty mounted data volume
    - avoid shipping local dev metadata in the image
 5. Update `.env.example` to match real code and remove stale `ELEVENLABS_*` entries.
-6. Decide whether the standalone guitar lesson is a core product surface or a demo; it is currently a major second app living in one HTML file.
-7. If upload scale matters, move upload transcription off the request path into a background job.
+6. If upload scale matters, move upload transcription off the request path into a background job.
 
 ## Practical summary
 
