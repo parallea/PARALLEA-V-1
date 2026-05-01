@@ -4,6 +4,7 @@ python-multipart
 edge-tts
 openai
 groq
+assemblyai
 openai-whisper
 torch
 sentence-transformers

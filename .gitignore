@@ -5,6 +5,7 @@ __pycache__/
 .pytest_cache/
 .env
 .env.*
+!docs/.env.example
 data/video_*/
 data/videos.json
 data/audio/
