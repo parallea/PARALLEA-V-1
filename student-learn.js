@@ -884,14 +884,14 @@
       return;
     }
 
-    const start = Math.max(0, Number(part.start_time || 0));
-    const rawEnd = Number(part.end_time || 0);
+    const start = Math.max(0, Number(part.start_time ?? videoInfo.start_time ?? 0));
+    const rawEnd = Number(part.end_time ?? videoInfo.end_time ?? 0);
     let end = rawEnd > start ? rawEnd : null;
     dom.partTitle.textContent = part.title || 'Lesson part';
     dom.partTime.textContent = end ? `${fmtTime(start)} - ${fmtTime(end)}` : `${fmtTime(start)}+`;
     dom.videoStatus.textContent = 'Preparing original teacher video part...';
     setFlowHint('Playing the original uploaded teacher video part.');
-    flowLog('original video segment start', {videoId: videoInfo.id, partId: part.id, start, end});
+    flowLog('original video segment start', {videoId: videoInfo.id, partId: part.id, partTitle: part.title, start, end});
 
     const finishPart = async reason => {
       if(token !== activeVideoToken || !videoPlaying) return;

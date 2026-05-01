@@ -191,11 +191,16 @@ class StudentSession:
     selected_topic: Optional[str] = None
     mode: Optional[str] = None  # "video_context" | "persona_only"
     current_roadmap_id: Optional[str] = None
+    current_video_id: Optional[str] = None
     current_part_id: Optional[str] = None
     current_part_index: int = 0
     state: str = "greeting"  # see SESSION_STATES below
     matched_part_ids: list[str] = field(default_factory=list)
     confidence: float = 0.0
+    last_played_part_id: Optional[str] = None
+    last_video_context_summary: str = ""
+    last_part_was_final: bool = False
+    next_suggested_topic: Optional[str] = None
     memory: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=utcnow)
     updated_at: str = field(default_factory=utcnow)

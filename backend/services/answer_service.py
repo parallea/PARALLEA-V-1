@@ -32,7 +32,7 @@ import math
 import re
 from typing import Any, Optional
 
-from config import MAX_MANIM_VISUAL_DURATION_SECONDS
+from config import MANIM_VISUAL_STYLE, MAX_MANIM_VISUAL_DURATION_SECONDS
 from backend.services.model_router import get_model_config, llm_json
 from manim_renderer import (
     direct_manim_validation_error,
@@ -150,7 +150,22 @@ def clear_all_regions(scene, active_regions, keep_title=False):
         clear_region(scene, active_regions, region_name)
 '''
 
-_MANIM_SAFE_LAYOUT_RULES = """Safe layout rules:
+_MANIM_CREATIVE_SAFE_RULES = """Creative Safe Mode:
+- Create a polished educational animation, not a slide deck.
+- Use creative visual metaphors when helpful: symbolic characters, data points, gears, factories, paths, cards, matrices, maps, or simple story objects drawn from Manim primitives.
+- Prefer smooth transformations, object movement, flowing arrows, highlight pulses, comparison diagrams, morphing shapes, and cause-effect motion.
+- Do not force every concept into rigid Step 1 / Step 2 panels.
+- Do not show generic visible labels like "Step 1", "Step 2", "Segment 1", or "Visual Step 1".
+- Use short meaningful labels instead, such as "Image as numbers", "Feature vector", "Matrix transformation", "Prediction", "Loss decreases", or "Pattern learned".
+- Keep the animation readable and uncluttered. Avoid long paragraphs and too many bullet points.
+- Keep important objects inside a 16:9 frame with comfortable margins; do not place text near extreme edges.
+- Fade out or transform old objects before placing new objects in the same area.
+- Use named variables for important groups instead of fragile hardcoded indexes like hierarchy[7].
+- Avoid arbitrary extreme shift values; use arrange(), next_to(), move_to(), align_to(), to_edge(..., buff=0.3), and scale_to_fit_width() when useful.
+- Draw creative metaphors with built-in Manim primitives only. Do not use ImageMobject, SVGMobject, or external asset files.
+- The final result should feel like a visual explainer video, not a static text board."""
+
+_MANIM_STRICT_LAYOUT_RULES = """Strict layout mode:
 - Use a 16:9 safe frame with SAFE_MARGIN = 0.35.
 - Keep all important objects inside the safe margin; never place text or diagrams on extreme edges.
 - Use fixed regions: title_region at the top, left_panel for bullets/equations, right_panel for diagrams or creative metaphors, and bottom_region for short takeaways/progress cues.
@@ -168,10 +183,48 @@ _MANIM_SAFE_LAYOUT_RULES = """Safe layout rules:
 - Keep visual metaphors creative, but draw them with built-in Manim primitives only. Do not use ImageMobject, SVGMobject, or external assets.
 - Use SurroundingRectangle and arrows sparingly. Do not overlap labels with diagrams."""
 
+_MANIM_SAFE_LAYOUT_RULES = _MANIM_STRICT_LAYOUT_RULES
+
 _MANIM_REGION_HELPERS_PROMPT = f"""Include this helper block exactly after `from manim import *` in generated Manim files, then use it for placement.
 Helper block:
 {_MANIM_REGION_HELPERS_CODE}
 End helper block."""
+
+
+def _manim_visual_style() -> str:
+    style = str(MANIM_VISUAL_STYLE or "creative_safe").strip().lower()
+    return style if style in {"creative_safe", "strict_layout", "fallback_only"} else "creative_safe"
+
+
+def _manim_generation_style_prompt() -> str:
+    style = _manim_visual_style()
+    if style == "strict_layout":
+        return "\n\n".join([_MANIM_STRICT_LAYOUT_RULES, _MANIM_REGION_HELPERS_PROMPT])
+    if style == "fallback_only":
+        return "\n\n".join(
+            [
+                "MANIM_VISUAL_STYLE=fallback_only is active. Prefer simple reliable visuals; the renderer may use local fallback scenes.",
+                _MANIM_STRICT_LAYOUT_RULES,
+                _MANIM_REGION_HELPERS_PROMPT,
+            ]
+        )
+    return _MANIM_CREATIVE_SAFE_RULES
+
+
+def _manim_repair_style_prompt() -> str:
+    style = _manim_visual_style()
+    if style == "strict_layout":
+        return "\n\n".join([_MANIM_STRICT_LAYOUT_RULES, _MANIM_REGION_HELPERS_PROMPT])
+    if style == "fallback_only":
+        return "\n\n".join([_MANIM_STRICT_LAYOUT_RULES, _MANIM_REGION_HELPERS_PROMPT])
+    return """Creative Safe repair rules:
+- Repair the exact validation or render failure while preserving the original visual metaphor and animation sequence.
+- Do not replace the scene with generic cards unless the original idea cannot be made executable.
+- Remove missing external assets by drawing an equivalent object with Manim primitives.
+- Replace fragile hardcoded indexes such as hierarchy[7] with named variables or loops.
+- Reduce offscreen shifts, add buff to edge placement when needed, and scale large text or diagrams down.
+- If an object appears where another object already exists, FadeOut or Transform the old group first.
+- If duration is too short, extend the same creative sequence across all spoken segments; do not add visible Step 1 / Step 2 labels."""
 
 
 def _clean_spaces(text: Any) -> str:
@@ -321,7 +374,7 @@ def _normalize_visual_steps(raw_steps: Any, spoken_segments: list[dict[str, Any]
         step_id = _clean_spaces(raw.get("id")) or _clean_spaces(speech.get("matching_visual_step_id")) or f"vis_{index + 1}"
         description = _clean_spaces(raw.get("description") or raw.get("cue") or raw.get("visualCue") or raw.get("matches_spoken_text"))
         if not description:
-            description = _trim_sentence(speech.get("text") or f"Visual step {index + 1}", 120)
+            description = _trim_sentence(speech.get("text") or "Key idea", 120)
         duration = _safe_float(raw.get("duration_seconds") or raw.get("duration") or raw.get("estimated_duration_seconds"), speech.get("estimated_duration_seconds") or 3.0)
         start = _safe_float(raw.get("start"), speech.get("start") or sum(step["duration_seconds"] for step in steps))
         end = _safe_float(raw.get("end"), start + duration)
@@ -447,7 +500,8 @@ Rules:
 - Must render using: `python -m manim -ql generated_scene.py GeneratedScene`.
 - Do NOT use Color(...), ManimColor(...), hsl=, rgb_to_color, `from colour`, `import colour`, or `from manim.utils.color`.
 - Use only built-in color constants: WHITE, BLACK, BLUE, BLUE_E, GREEN, GREEN_E, RED, RED_E, YELLOW, ORANGE, PURPLE, GREY, GRAY.
-- Keep the scene simple and reliable.
+- In creative_safe mode, render the OpenAI scene directly when it passes hard safety checks; do not convert it into a rigid template.
+- Keep the scene reliable, but make it visually engaging.
 - Match the provided speech and visual cues. Use `self.play(...)` and `self.wait(...)` to pace the animation.
 
 Return STRICT JSON only:
@@ -477,8 +531,7 @@ def _manim_visual_system(*, force_no_latex: bool = False, rejection_reason: str 
     return "\n\n".join(
         [
             _MANIM_VISUAL_SYSTEM_BASE,
-            _MANIM_SAFE_LAYOUT_RULES,
-            _MANIM_REGION_HELPERS_PROMPT,
+            _manim_generation_style_prompt(),
             _manim_latex_prompt_rules(force_no_latex=force_no_latex, rejection_reason=rejection_reason),
         ]
     )
@@ -559,6 +612,14 @@ Use step-by-step animations:
 - show cause-effect
 - use diagrams instead of walls of text
 
+Creative quality rules:
+- Create a polished educational animation, not a slide deck.
+- Use creative visual metaphors when they help the explanation.
+- Prefer smooth transformations, flowing arrows, highlight pulses, comparison diagrams, symbolic objects drawn from primitives, moving data points, and matrices/vectors transforming.
+- Do not show generic visible labels like "Step 1", "Step 2", "Segment 1", or "Visual Step 1".
+- Use short meaningful labels tied to the concept instead.
+- Fade out or transform old objects before placing new objects in the same area.
+
 Do not create a boring text board.
 Do not create mostly static rectangles and text.
 
@@ -627,7 +688,10 @@ Rules:
 - do not use Color(...), ManimColor(...), hsl=, rgb_to_color, colour, or manim.utils.color
 - use only built-in color constants: WHITE, BLACK, BLUE, BLUE_E, GREEN, GREEN_E, RED, RED_E, YELLOW, ORANGE, PURPLE, GREY, GRAY
 - keep all objects inside a 16:9 frame
-- keep the scene simple and reliable
+- preserve the original creative metaphor and visual style whenever possible
+- repair the smallest executable problem before simplifying the whole scene
+- keep the scene reliable without turning it into generic Step 1 / Step 2 cards
+- do not show generic visible labels like "Step 1", "Segment 1", or "Visual Step 1"
 - if repairing visual_too_short_for_spoken_answer, extend timing/waits and implement every visual step instead of returning an intro-only scene
 - keep total visual duration at or below 90 seconds
 """
@@ -637,8 +701,7 @@ def _combined_teaching_system_prompt() -> str:
     return "\n\n".join(
         [
             _COMBINED_TEACHING_SYSTEM_BASE,
-            _MANIM_SAFE_LAYOUT_RULES,
-            _MANIM_REGION_HELPERS_PROMPT,
+            _manim_generation_style_prompt(),
             _manim_latex_prompt_rules(),
         ]
     )
@@ -648,8 +711,7 @@ def _clarify_roadmap_part_system_prompt() -> str:
     return "\n\n".join(
         [
             _CLARIFY_ROADMAP_PART_SYSTEM,
-            _MANIM_SAFE_LAYOUT_RULES,
-            _MANIM_REGION_HELPERS_PROMPT,
+            _manim_generation_style_prompt(),
             _manim_latex_prompt_rules(),
         ]
     )
@@ -659,8 +721,7 @@ def _manim_repair_system_prompt(*, force_no_latex: bool = False, rejection_reaso
     return "\n\n".join(
         [
             _MANIM_REPAIR_SYSTEM,
-            _MANIM_SAFE_LAYOUT_RULES,
-            _MANIM_REGION_HELPERS_PROMPT,
+            _manim_repair_style_prompt(),
             _manim_latex_prompt_rules(force_no_latex=force_no_latex, rejection_reason=rejection_reason),
         ]
     )
@@ -937,7 +998,7 @@ def _fallback_combined_manim_code(
         speech = speech_segments[min(index, len(speech_segments) - 1)] if speech_segments else {}
         visual = visual_segments[min(index, len(visual_segments) - 1)] if visual_segments else {}
         label = _trim_sentence(
-            visual.get("description") or visual.get("text") or visual.get("cue") or speech.get("text") or "Next step",
+            visual.get("description") or visual.get("text") or visual.get("cue") or speech.get("text") or "Key idea",
             54,
         )
         speech_text = _trim_sentence(speech.get("text") or label, 86)
@@ -963,12 +1024,12 @@ class {MANIM_SCENE_CLASS_NAME}(Scene):
         steps = {steps_literal}
         topic_label = {topic_literal}
         for index, step in enumerate(steps):
-            label = step.get("label") or "Next step"
+            label = step.get("label") or "Key idea"
             speech = step.get("speech") or label
             duration = max(2.4, float(step.get("duration") or 4.0))
-            progress = safe_text(f"Step {{index + 1}} of {{len(steps)}}", font_size=22, max_width=11.5)
-            place_bottom(progress)
-            replace_region(self, active_regions, "bottom", progress)
+            focus = safe_text(label, font_size=22, max_width=11.5)
+            place_bottom(focus)
+            replace_region(self, active_regions, "bottom", focus)
 
             left_items = [label, speech]
             if index == 0:
@@ -1303,7 +1364,7 @@ async def generate_teaching_response_with_visuals(
     del available_visual_mode
     normalized_mode = mode if mode in {"video_context_clarification", "persona_only_teaching"} else "persona_only_teaching"
     cfg = get_model_config("teaching_pipeline")
-    logger.info("[teaching-pipeline] provider=%s model=%s mode=%s", cfg.provider, cfg.model, normalized_mode)
+    logger.info("[teaching-pipeline] provider=%s model=%s mode=%s manim_visual_style=%s", cfg.provider, cfg.model, normalized_mode, _manim_visual_style())
     logger.info(
         "[student-models] teaching_pipeline provider=%s model=%s visual_generation_provider=%s visual_generation_model=%s",
         cfg.provider,
@@ -1366,6 +1427,7 @@ async def generate_teaching_response_with_visuals(
             "openai_used": bool(cfg.provider == "openai" and raw),
             "llm_response_received": bool(raw),
             "manim_code_source": (normalized.get("visual") or {}).get("manimCodeSource") or "unknown",
+            "manim_visual_style": _manim_visual_style(),
             "previous_assistant_answer_included": bool(previous_assistant_answer),
             "recent_turns_included": len(recent_turns),
         }
@@ -1433,6 +1495,7 @@ async def repair_manim_code_with_error(
     title: str = "",
 ) -> dict[str, Any]:
     cfg = get_model_config("visual")
+    style = _manim_visual_style()
     logger.info("[student-models] repair_generation provider=%s model=%s", cfg.provider, cfg.model)
     logger.info("[manim] repair request provider=%s model=%s error_chars=%s failed_code_chars=%s", cfg.provider, cfg.model, len(error_log or ""), len(failed_code or ""))
     user = f"""
@@ -1468,11 +1531,17 @@ Full validation/render error log, including final stderr/stdout tails when avail
 
 Task:
 Repair the Manim code so it renders safely and still follows the same spoken answer and visual plan.
+Active Manim visual style:
+{style}
+
 If the error is visual_too_short_for_spoken_answer, rewrite or extend the scene so it covers every spoken segment and targets 75-100% of the estimated spoken duration, capped at 90 seconds.
 If the previous video was only about 20 seconds for a much longer explanation, do not merely patch syntax; rewrite the timing and waits to cover all spoken segments.
 Simplify the scene if the error came from animation complexity, mobject state, transform matching, or unsupported Manim behavior.
-Rewrite it using the region-based layout helpers. Preserve the educational idea and creative metaphor, but prevent cropped objects, overlapping objects, and stacked replacements.
-Before showing new content in an occupied region, call replace_region(self, active_regions, region_name, new_group) so the previous group fades out first.
+Preserve the educational idea, creative metaphor, object motion, and animation sequence.
+Do not replace the scene with generic Step 1 / Step 2 cards.
+Do not show generic visible text such as "Step 1", "Segment 1", or "Visual Step 1"; use meaningful concept labels.
+If strict_layout mode is active, rewrite using the region-based layout helpers. In creative_safe mode, use helpers only when they are the cleanest fix.
+Before showing new content in an occupied area, FadeOut or Transform the old group first.
 Avoid complex transforms if they caused failure; prefer simple FadeOut/FadeIn region replacement.
 Use only built-in Manim primitives and avoid external assets.
 """.strip()
@@ -1709,7 +1778,13 @@ Visual cues/timestamps:
     try:
         result = await llm_json("visual", _manim_visual_system(), user, max_tokens=4200, temperature=0.15)
         code = (result.get("manimCode") or result.get("code") or "").strip() if isinstance(result, dict) else ""
-        logger.info("[manim] code_received length=%s text_only_mode=%s latex_available=%s", len(code), text_only, has_latex_available())
+        logger.info(
+            "[manim] code_received length=%s text_only_mode=%s latex_available=%s manim_visual_style=%s",
+            len(code),
+            text_only,
+            has_latex_available(),
+            _manim_visual_style(),
+        )
         validation_error = direct_manim_validation_error(code) if code else "empty Manim code"
         if code and validation_error:
             logger.warning("[manim] generated code failed validation error=%s; retrying stricter generation", validation_error)

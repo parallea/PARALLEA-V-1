@@ -167,6 +167,158 @@ class StudentPipelineContinuityTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Step 2", memory.get("last_assistant_answer", ""))
         self.assertGreaterEqual(len(memory.get("recent_turns") or []), 6)
 
+    async def test_topic_match_starts_matched_middle_part_not_first(self) -> None:
+        student = {"id": "usr_test", "name": "Test Student"}
+        persona = {"id": "per_test", "teacher_name": "Demo Teacher", "active_persona_prompt": "Teach clearly."}
+        video = {"id": "vid_test", "persona_id": "per_test", "title": "Linear algebra lesson", "status": "ready"}
+        roadmap = {"id": "rmp_test", "video_id": "vid_test", "persona_id": "per_test", "title": "ML math"}
+        parts = MemoryRepo([
+            {"id": "prt_1", "roadmap_id": "rmp_test", "order": 0, "title": "Intro", "start_time": 0.0, "end_time": 70.0},
+            {"id": "prt_2", "roadmap_id": "rmp_test", "order": 1, "title": "Matrix operations", "start_time": 70.0, "end_time": 140.0},
+            {"id": "prt_3", "roadmap_id": "rmp_test", "order": 2, "title": "Neural nets", "start_time": 140.0, "end_time": 210.0},
+        ])
+        sessions = MemoryRepo()
+        messages = MemoryRepo()
+        routing = {
+            "topicExists": True,
+            "mode": "video_context",
+            "matchedRoadmapId": "rmp_test",
+            "matchedVideoId": "vid_test",
+            "matchedPartId": "prt_2",
+            "matchedPartIds": ["prt_2", "prt_3"],
+            "matchedPartTitle": "Matrix operations",
+            "confidence": 0.91,
+            "start_time": 70.0,
+            "end_time": 140.0,
+            "studentTopic": "matrix operations",
+            "matchReason": "phrase match in part title",
+        }
+
+        with (
+            patch.object(session_manager, "sessions_repo", sessions),
+            patch.object(session_manager, "messages_repo", messages),
+            patch.object(session_manager, "users_repo", MemoryRepo([student])),
+            patch.object(session_manager, "personas_repo", MemoryRepo([persona])),
+            patch.object(session_manager, "missing_topics_repo", MemoryRepo()),
+            patch.object(session_manager, "roadmaps_repo", MemoryRepo([roadmap])),
+            patch.object(session_manager, "roadmap_parts_repo", parts),
+            patch.object(session_manager, "videos_repo", MemoryRepo([video])),
+            patch.object(session_manager, "match_student_topic_to_roadmaps", return_value=routing),
+        ):
+            created = session_manager.create_session(student=student, persona=persona)
+            env = await session_manager.set_topic(created["session"]["id"], "matrix operations")
+
+        self.assertEqual(env["promptFor"], "video_part")
+        self.assertEqual(env["currentPart"]["id"], "prt_2")
+        self.assertEqual(env["currentPart"]["start_time"], 70.0)
+        self.assertEqual(env["currentVideo"]["id"], "vid_test")
+        self.assertEqual(env["currentVideo"]["start_time"], 70.0)
+        persisted = sessions.get(created["session"]["id"]) or {}
+        self.assertEqual(persisted.get("current_part_id"), "prt_2")
+        self.assertEqual(persisted.get("current_video_id"), "vid_test")
+
+    async def test_continue_uses_next_consecutive_part_not_first(self) -> None:
+        student = {"id": "usr_test", "name": "Test Student"}
+        persona = {"id": "per_test", "teacher_name": "Demo Teacher", "active_persona_prompt": "Teach clearly."}
+        video = {"id": "vid_test", "persona_id": "per_test", "title": "Linear algebra lesson", "status": "ready"}
+        roadmap = {"id": "rmp_test", "video_id": "vid_test", "persona_id": "per_test", "title": "ML math"}
+        session = {
+            "id": "ses_test",
+            "student_id": "usr_test",
+            "persona_id": "per_test",
+            "selected_topic": "matrix operations",
+            "mode": "video_context",
+            "state": "awaiting_part_feedback",
+            "current_roadmap_id": "rmp_test",
+            "current_video_id": "vid_test",
+            "current_part_id": "prt_2",
+            "current_part_index": 1,
+            "matched_part_ids": ["prt_2", "prt_3"],
+            "memory": {},
+        }
+        parts = MemoryRepo([
+            {"id": "prt_1", "roadmap_id": "rmp_test", "order": 0, "title": "Intro", "start_time": 0.0, "end_time": 70.0},
+            {"id": "prt_2", "roadmap_id": "rmp_test", "order": 1, "title": "Matrix operations", "start_time": 70.0, "end_time": 140.0},
+            {"id": "prt_3", "roadmap_id": "rmp_test", "order": 2, "title": "Neural nets", "start_time": 140.0, "end_time": 210.0},
+        ])
+
+        with (
+            patch.object(session_manager, "sessions_repo", MemoryRepo([session])),
+            patch.object(session_manager, "messages_repo", MemoryRepo()),
+            patch.object(session_manager, "users_repo", MemoryRepo([student])),
+            patch.object(session_manager, "personas_repo", MemoryRepo([persona])),
+            patch.object(session_manager, "roadmaps_repo", MemoryRepo([roadmap])),
+            patch.object(session_manager, "roadmap_parts_repo", parts),
+            patch.object(session_manager, "videos_repo", MemoryRepo([video])),
+        ):
+            env = await session_manager.send_message("ses_test", "continue")
+
+        self.assertEqual(env["promptFor"], "video_part")
+        self.assertEqual(env["currentPart"]["id"], "prt_3")
+        self.assertEqual(env["currentPart"]["start_time"], 140.0)
+        self.assertEqual(env["session"]["state"], "playing_video_part")
+
+    async def test_last_part_continue_switches_to_persona_continuation(self) -> None:
+        student = {"id": "usr_test", "name": "Test Student"}
+        persona = {
+            "id": "per_test",
+            "teacher_name": "Demo Teacher",
+            "profession": "Math teacher",
+            "active_persona_prompt": "Teach clearly.",
+            "detected_topics": ["Linear algebra applications"],
+        }
+        video = {"id": "vid_test", "persona_id": "per_test", "title": "Linear algebra lesson", "status": "ready"}
+        roadmap = {"id": "rmp_test", "video_id": "vid_test", "persona_id": "per_test", "title": "ML math", "topics": ["Linear algebra applications"]}
+        session = {
+            "id": "ses_test",
+            "student_id": "usr_test",
+            "persona_id": "per_test",
+            "selected_topic": "svd",
+            "mode": "video_context",
+            "state": "awaiting_part_feedback",
+            "current_roadmap_id": "rmp_test",
+            "current_video_id": "vid_test",
+            "current_part_id": "prt_2",
+            "current_part_index": 1,
+            "memory": {},
+        }
+        parts = MemoryRepo([
+            {"id": "prt_1", "roadmap_id": "rmp_test", "order": 0, "title": "Intro", "start_time": 0.0, "end_time": 70.0},
+            {"id": "prt_2", "roadmap_id": "rmp_test", "order": 1, "title": "SVD wrap-up", "summary": "The final uploaded part.", "start_time": 70.0, "end_time": 140.0},
+        ])
+
+        async def fake_generate(**_: Any) -> dict[str, Any]:
+            return {
+                "speech": {"text": "Now we extend the lesson with a new visual example.", "segments": []},
+                "visual": {"visualNeeded": True, "visualType": "manim", "manimCode": FAKE_MANIM_STEP_1},
+                "teachingControl": {"askFollowUp": "Want to keep going?"},
+            }
+
+        async def fake_render(*_: Any, **__: Any) -> dict[str, Any]:
+            return {"type": "manim", "status": "ready", "renderStatus": "ready", "videoUrl": "/rendered-scenes/manim/next.mp4"}
+
+        sessions = MemoryRepo([session])
+        with (
+            patch.object(session_manager, "sessions_repo", sessions),
+            patch.object(session_manager, "messages_repo", MemoryRepo()),
+            patch.object(session_manager, "users_repo", MemoryRepo([student])),
+            patch.object(session_manager, "personas_repo", MemoryRepo([persona])),
+            patch.object(session_manager, "roadmaps_repo", MemoryRepo([roadmap])),
+            patch.object(session_manager, "roadmap_parts_repo", parts),
+            patch.object(session_manager, "videos_repo", MemoryRepo([video])),
+            patch.object(session_manager, "generate_teaching_response_with_visuals", fake_generate),
+            patch.object(session_manager, "_render_teaching_visual", fake_render),
+        ):
+            env = await session_manager.send_message("ses_test", "continue")
+
+        self.assertEqual(env["session"]["state"], "persona_only_teaching")
+        self.assertEqual(env["session"]["mode"], "persona_continuation_after_video")
+        self.assertIn("last uploaded video part", env["message"]["content"])
+        self.assertEqual(env["visual"]["type"], "manim")
+        persisted = sessions.get("ses_test") or {}
+        self.assertTrue(persisted.get("last_part_was_final"))
+        self.assertTrue(persisted.get("next_suggested_topic"))
+
     def test_generated_runtime_paths_are_reload_excluded(self) -> None:
         self.assertTrue(dev_reload.is_generated_runtime_path(MANIM_RUNTIME_DIR / "scenes" / "generated.py"))
         self.assertTrue(dev_reload.is_generated_runtime_path(MANIM_PUBLIC_OUTPUT_DIR / "generated.py"))

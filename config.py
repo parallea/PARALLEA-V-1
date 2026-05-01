@@ -137,6 +137,8 @@ MANIM_ENABLED = env_bool("MANIM_ENABLED", True)
 MANIM_FORCE_TEXT_ONLY = env_bool("MANIM_FORCE_TEXT_ONLY", False)
 MANIM_ALLOW_MATHTEX = env_choice("MANIM_ALLOW_MATHTEX", "auto", {"auto", "0", "1"})
 MANIM_REQUIRE_LATEX = env_bool("MANIM_REQUIRE_LATEX", False)
+MANIM_VISUAL_STYLE = env_choice("MANIM_VISUAL_STYLE", "creative_safe", {"creative_safe", "strict_layout", "fallback_only"})
+ROADMAP_PART_MATCH_THRESHOLD = min(1.0, max(0.0, env_float("ROADMAP_PART_MATCH_THRESHOLD", 0.45)))
 
 for d in [DATA_DIR, TMP_DIR, UPLOADS_DIR, THUMBNAILS_DIR, AUDIO_DIR, SESSIONS_DIR, RENDERS_DIR, MANIM_RUNTIME_DIR, MANIM_DEBUG_DIR, PUBLIC_DIR, MANIM_PUBLIC_OUTPUT_DIR]:
     d.mkdir(parents=True, exist_ok=True)

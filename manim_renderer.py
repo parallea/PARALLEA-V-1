@@ -26,6 +26,7 @@ from config import (
     MANIM_RENDER_TIMEOUT_SECONDS,
     MANIM_REQUIRE_LATEX,
     MANIM_RUNTIME_DIR,
+    MANIM_VISUAL_STYLE,
     RENDERS_DIR,
     TMP_DIR,
 )
@@ -66,6 +67,8 @@ DIRECT_MANIM_RENDERER_VERSION = "openai_direct_manim_v1"
 DIRECT_SCENE_CLASS_NAME = "GeneratedScene"
 OPENAI_DIRECT_SCENE_CLASS_NAME = "ParalleaGeneratedScene"
 DIRECT_SCENE_CLASS_NAMES = {DIRECT_SCENE_CLASS_NAME, OPENAI_DIRECT_SCENE_CLASS_NAME}
+MANIM_VISUAL_STYLE_CHOICES = {"creative_safe", "strict_layout", "fallback_only"}
+GENERIC_VISIBLE_STEP_LABEL_RE = re.compile(r"\b(?:Step|Segment)\s*\d+(?:\s+of\s+\d+)?\b|\bVisual\s+Step(?:\s*\d+)?\b", re.I)
 TEX_DEPENDENT_CALL_RE = re.compile(r"\b(MathTex|Tex|SingleStringMathTex)\s*\(")
 TEX_DEPENDENT_NAMES = {"MathTex", "Tex", "SingleStringMathTex"}
 UNSAFE_IMPORT_ROOTS = {"os", "sys", "subprocess", "socket", "requests", "urllib", "http", "httpx", "pathlib", "shutil"}
@@ -441,6 +444,119 @@ def strip_code_fences(code: str) -> str:
     return text.strip()
 
 
+def effective_manim_visual_style(value: Any = None) -> str:
+    style = clean_spaces(value or MANIM_VISUAL_STYLE).strip().lower()
+    return style if style in MANIM_VISUAL_STYLE_CHOICES else "creative_safe"
+
+
+def visible_step_labels_detected(code: str) -> bool:
+    """Return True when visible Manim text contains generic step labels."""
+    text = strip_code_fences(code)
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return bool(GENERIC_VISIBLE_STEP_LABEL_RE.search(text))
+    visible_text_calls = {"Text", "MarkupText", "MathTex", "Tex", "safe_text"}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or _call_name(node.func) not in visible_text_calls or not node.args:
+            continue
+        first = node.args[0]
+        if isinstance(first, ast.Constant) and isinstance(first.value, str) and GENERIC_VISIBLE_STEP_LABEL_RE.search(first.value):
+            return True
+        if isinstance(first, ast.JoinedStr):
+            joined = "".join(part.value if isinstance(part, ast.Constant) and isinstance(part.value, str) else "{}" for part in first.values)
+            if GENERIC_VISIBLE_STEP_LABEL_RE.search(joined):
+                return True
+    return False
+
+
+def _payload_visual_label_candidates(payload: dict[str, Any] | None) -> list[str]:
+    data = payload or {}
+    raw_steps: list[Any] = []
+    for source in (
+        data.get("visual_steps"),
+        (data.get("av_sync") or {}).get("visual_steps") if isinstance(data.get("av_sync"), dict) else None,
+        data.get("visual_plan"),
+        data.get("timestamps"),
+    ):
+        if isinstance(source, list):
+            raw_steps.extend(source)
+    labels: list[str] = []
+    for item in raw_steps:
+        if not isinstance(item, dict):
+            continue
+        label = clean_spaces(item.get("label") or item.get("title") or item.get("description") or item.get("cue") or item.get("visualCue"))
+        if not label:
+            continue
+        label = re.sub(r"^(animate|show|reveal|highlight|draw|move|transform|explain|visualize)\s+", "", label, flags=re.I)
+        label = trim_sentence(label, 42)
+        if label and not GENERIC_VISIBLE_STEP_LABEL_RE.search(label):
+            labels.append(label)
+    labels.extend(["Core idea", "Key relationship", "Transformation", "Pattern learned", "Quick check"])
+    deduped: list[str] = []
+    for label in labels:
+        if label and label not in deduped:
+            deduped.append(label)
+    return deduped
+
+
+def replace_visible_step_labels(code: str, payload: dict[str, Any] | None = None) -> tuple[str, bool]:
+    """Replace generic visible step labels with concept labels without templating the scene."""
+    text = strip_code_fences(code)
+    labels = _payload_visual_label_candidates(payload)
+    used = 0
+    changed = False
+
+    def next_label() -> str:
+        nonlocal used
+        label = labels[min(used, len(labels) - 1)] if labels else "Key idea"
+        used += 1
+        return label
+
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        repaired = GENERIC_VISIBLE_STEP_LABEL_RE.sub(lambda _match: next_label(), text)
+        return repaired, repaired != text
+
+    visible_text_calls = {"Text", "MarkupText", "MathTex", "Tex", "safe_text"}
+    literals: list[str] = []
+    fstring_patterns: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or _call_name(node.func) not in visible_text_calls or not node.args:
+            continue
+        first = node.args[0]
+        if isinstance(first, ast.Constant) and isinstance(first.value, str) and GENERIC_VISIBLE_STEP_LABEL_RE.search(first.value):
+            literals.append(first.value)
+        elif isinstance(first, ast.JoinedStr):
+            joined = "".join(part.value if isinstance(part, ast.Constant) and isinstance(part.value, str) else "{}" for part in first.values)
+            if GENERIC_VISIBLE_STEP_LABEL_RE.search(joined):
+                fstring_patterns.append(joined)
+
+    for literal in literals:
+        replacement = json.dumps(next_label())
+        variants = {
+            json.dumps(literal): replacement,
+            "'" + literal.replace("\\", "\\\\").replace("'", "\\'") + "'": replacement,
+        }
+        for old, new in variants.items():
+            if old in text:
+                text = text.replace(old, new)
+                changed = True
+
+    # Generated code sometimes uses f"Step {index + 1}" as a visible progress
+    # string. Replace only the common visible text argument patterns.
+    if fstring_patterns:
+        text, count = re.subn(
+            r"(Text|MarkupText|MathTex|Tex|safe_text)\s*\(\s*f[\"'](?:Step|Segment)\s*\{[^)]*?[\"']",
+            lambda match: f"{match.group(1)}({json.dumps(next_label())}",
+            text,
+            flags=re.I,
+        )
+        changed = changed or bool(count)
+    return text, changed
+
+
 def contains_tex_dependent_manim(code: str) -> bool:
     return bool(TEX_DEPENDENT_CALL_RE.search(str(code or "")))
 
@@ -467,31 +583,101 @@ def _looks_like_external_asset(value: Any) -> bool:
     return any(normalized.endswith(ext) or f"{ext}?" in normalized for ext in EXTERNAL_ASSET_EXTENSIONS)
 
 
-def _risky_layout_error(text: str) -> str | None:
-    if not re.search(r"active_regions\s*=\s*\{", text) or "replace_region(self" not in text:
-        return "layout risk: generated scene must use active_regions and replace_region for region-safe replacement"
+def _shift_layout_error(text: str, *, strict: bool) -> str | None:
+    vertical_limit = 3.4 if strict else 4.0
+    horizontal_limit = 6.0 if strict else 7.0
     for match in re.finditer(r"\.shift\s*\(\s*(UP|DOWN|LEFT|RIGHT)\s*\*\s*([0-9]+(?:\.[0-9]+)?)", text):
         direction = match.group(1)
         amount = float(match.group(2))
-        limit = 3.4 if direction in {"UP", "DOWN"} else 6.0
+        limit = vertical_limit if direction in {"UP", "DOWN"} else horizontal_limit
         if amount >= limit:
             return f"layout risk: extreme {direction} shift {amount} can crop the frame"
     for match in re.finditer(r"\.shift\s*\(\s*([0-9]+(?:\.[0-9]+)?)\s*\*\s*(UP|DOWN|LEFT|RIGHT)", text):
         amount = float(match.group(1))
         direction = match.group(2)
-        limit = 3.4 if direction in {"UP", "DOWN"} else 6.0
+        limit = vertical_limit if direction in {"UP", "DOWN"} else horizontal_limit
         if amount >= limit:
             return f"layout risk: extreme {direction} shift {amount} can crop the frame"
+    return None
+
+
+def _to_edge_layout_error(text: str, *, strict: bool) -> str | None:
     for match in re.finditer(r"\.to_edge\s*\(([^)]*)\)", text):
         args = match.group(1)
         if "buff" not in args:
-            return "layout risk: to_edge must use buff >= 0.3 or region placement helpers"
+            if strict:
+                return "layout risk: to_edge must use buff >= 0.3 or region placement helpers"
+            line_start = text.rfind("\n", 0, match.start()) + 1
+            line = text[line_start:text.find("\n", match.start()) if text.find("\n", match.start()) != -1 else len(text)]
+            important_text = bool(re.search(r"\b(Text|MarkupText|MathTex|Tex|safe_text)\s*\(", line)) or bool(re.search(r"\b(title|label|caption|heading|formula|text)\b", line, re.I))
+            if important_text and re.search(r"\b(UP|DOWN|LEFT|RIGHT)\b", args):
+                return "layout risk: visible text uses to_edge without buff; add buff >= 0.3 or move it inward"
+            continue
         buff_match = re.search(r"buff\s*=\s*([0-9]+(?:\.[0-9]+)?)", args)
-        if buff_match and float(buff_match.group(1)) < 0.3:
-            return "layout risk: to_edge buff must be at least 0.3"
+        if buff_match:
+            minimum = 0.3 if strict else 0.15
+            if float(buff_match.group(1)) < minimum:
+                return f"layout risk: to_edge buff must be at least {minimum}"
+    return None
+
+
+def _font_size_layout_error(text: str, *, strict: bool) -> str | None:
+    limit = 52 if strict else 80
     for match in re.finditer(r"font_size\s*=\s*([0-9]+)", text):
-        if int(match.group(1)) > 52:
+        if int(match.group(1)) > limit:
             return f"layout risk: font_size {match.group(1)} is too large for safe 16:9 layout"
+    return None
+
+
+def _subscript_base_name(node: ast.AST) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    if isinstance(node, ast.Subscript):
+        return _subscript_base_name(node.value)
+    if isinstance(node, ast.Call):
+        return _call_name(node.func)
+    return ""
+
+
+def _subscript_index_int(node: ast.AST) -> int | None:
+    if isinstance(node, ast.Constant) and isinstance(node.value, int):
+        return int(node.value)
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub) and isinstance(node.operand, ast.Constant) and isinstance(node.operand.value, int):
+        return -int(node.operand.value)
+    return None
+
+
+def _unsafe_group_index_error(tree: ast.AST) -> str | None:
+    risky_base_names = {"hierarchy", "group", "groups", "children", "mobjects", "items", "layers", "parts", "objects", "nodes"}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Subscript):
+            continue
+        index = _subscript_index_int(node.slice)
+        if index is None or index < 6:
+            continue
+        base_name = _subscript_base_name(node.value).lower()
+        if base_name in risky_base_names:
+            return f"unsafe hardcoded group indexing: {base_name}[{index}] can fail when generated hierarchy size changes"
+    return None
+
+
+def _creative_safe_layout_error(text: str, tree: ast.AST) -> str | None:
+    return (
+        _unsafe_group_index_error(tree)
+        or _shift_layout_error(text, strict=False)
+        or _to_edge_layout_error(text, strict=False)
+        or _font_size_layout_error(text, strict=False)
+    )
+
+
+def _risky_layout_error(text: str) -> str | None:
+    if not re.search(r"active_regions\s*=\s*\{", text) or "replace_region(self" not in text:
+        return "layout risk: generated scene must use active_regions and replace_region for region-safe replacement"
+    layout_error = _shift_layout_error(text, strict=True) or _to_edge_layout_error(text, strict=True) or _font_size_layout_error(text, strict=True)
+    if layout_error:
+        return layout_error
     text_call_count = len(re.findall(r"\b(?:Text|MarkupText|MathTex|Tex)\s*\(", text))
     if text_call_count and not any(token in text for token in ("safe_text(", "fit_to_region(", "scale_to_fit_width")):
         return "layout risk: Text/MathTex objects must be created with safe_text or fitted to a region"
@@ -514,8 +700,14 @@ def normalize_direct_scene_class_name(value: Any = "") -> str:
     return name if name in DIRECT_SCENE_CLASS_NAMES else DIRECT_SCENE_CLASS_NAME
 
 
-def direct_manim_validation_error(code: str, *, scene_class_name: str = DIRECT_SCENE_CLASS_NAME) -> str | None:
+def direct_manim_validation_error(
+    code: str,
+    *,
+    scene_class_name: str = DIRECT_SCENE_CLASS_NAME,
+    visual_style: str | None = None,
+) -> str | None:
     text = strip_code_fences(code)
+    style = effective_manim_visual_style(visual_style)
     try:
         tree = ast.parse(text)
     except SyntaxError as exc:
@@ -582,7 +774,10 @@ def direct_manim_validation_error(code: str, *, scene_class_name: str = DIRECT_S
 
     if not has_manim_star_import:
         return "missing `from manim import *`"
-    layout_error = _risky_layout_error(text)
+    if style == "strict_layout":
+        layout_error = _risky_layout_error(text)
+    else:
+        layout_error = _creative_safe_layout_error(text, tree)
     if layout_error:
         return layout_error
     return None
@@ -646,8 +841,31 @@ def prepare_direct_manim_code(
     *,
     scene_class_name: str = DIRECT_SCENE_CLASS_NAME,
 ) -> tuple[str, dict[str, Any]]:
+    payload = payload or {}
+    visual_style = effective_manim_visual_style(payload.get("manim_visual_style"))
     scene_class_name = normalize_direct_scene_class_name(scene_class_name or (payload or {}).get("scene_class_name"))
     text = strip_code_fences(code)
+    visible_labels = visible_step_labels_detected(text)
+    labels_repaired = False
+    if visible_labels:
+        text, labels_repaired = replace_visible_step_labels(text, payload)
+        logger.info(
+            "[manim] visible_step_labels_detected=true repaired=%s visual_style=%s",
+            str(labels_repaired).lower(),
+            visual_style,
+        )
+    if visual_style == "fallback_only":
+        logger.warning("[manim] MANIM_VISUAL_STYLE=fallback_only; using local fallback scene")
+        return fallback_direct_manim_code(payload, "MANIM_VISUAL_STYLE=fallback_only", scene_class_name=scene_class_name), {
+            "valid": False,
+            "error": "MANIM_VISUAL_STYLE=fallback_only",
+            "fallback_used": True,
+            "manim_visual_style": visual_style,
+            "original_code_render_attempted": False,
+            "validation_result": "fallback_only",
+            "visible_step_labels_detected": visible_labels,
+            "visible_step_labels_repaired": labels_repaired,
+        }
     found_classes = re.findall(r"^\s*class\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", text, flags=re.M)
     if len(found_classes) == 1 and found_classes[0] in DIRECT_SCENE_CLASS_NAMES and found_classes[0] != scene_class_name:
         text = re.sub(
@@ -656,13 +874,22 @@ def prepare_direct_manim_code(
             text,
             count=1,
         )
-    validation_error = direct_manim_validation_error(text, scene_class_name=scene_class_name)
+    validation_error = direct_manim_validation_error(text, scene_class_name=scene_class_name, visual_style=visual_style)
     if validation_error:
-        logger.warning("manim direct code validation failed error=%s; using fallback scene", validation_error)
+        logger.warning(
+            "manim direct code validation failed visual_style=%s error=%s; using fallback scene",
+            visual_style,
+            validation_error,
+        )
         return fallback_direct_manim_code(payload, validation_error, scene_class_name=scene_class_name), {
             "valid": False,
             "error": validation_error,
             "fallback_used": True,
+            "manim_visual_style": visual_style,
+            "original_code_render_attempted": False,
+            "validation_result": "failed",
+            "visible_step_labels_detected": visible_labels,
+            "visible_step_labels_repaired": labels_repaired,
         }
     try:
         compile(text, "<generated_manim>", "exec")
@@ -672,8 +899,22 @@ def prepare_direct_manim_code(
             "valid": False,
             "error": str(exc),
             "fallback_used": True,
+            "manim_visual_style": visual_style,
+            "original_code_render_attempted": False,
+            "validation_result": "compile_failed",
+            "visible_step_labels_detected": visible_labels,
+            "visible_step_labels_repaired": labels_repaired,
         }
-    return text, {"valid": True, "error": None, "fallback_used": False}
+    return text, {
+        "valid": True,
+        "error": None,
+        "fallback_used": False,
+        "manim_visual_style": visual_style,
+        "original_code_render_attempted": True,
+        "validation_result": "ok",
+        "visible_step_labels_detected": visible_labels,
+        "visible_step_labels_repaired": labels_repaired,
+    }
 
 
 def risky_python_version(version_text: str) -> bool:
@@ -717,6 +958,7 @@ def manim_runtime_info() -> dict[str, Any]:
         "manim_allow_mathtex_effective": manim_allow_mathtex_effective_value(),
         "manim_require_latex": MANIM_REQUIRE_LATEX,
         "manim_force_text_only": MANIM_FORCE_TEXT_ONLY,
+        "manim_visual_style": effective_manim_visual_style(),
         "latex_required_missing": bool(MANIM_REQUIRE_LATEX and not latex_info.get("latex_available")),
     }
     probe = [
@@ -756,7 +998,7 @@ def manim_runtime_info() -> dict[str, Any]:
 def log_manim_runtime_status() -> dict[str, Any]:
     info = manim_runtime_info()
     logger.info(
-        "manim-runtime python=%s version=%s manim_importable=%s manim_version=%s ffmpeg_available=%s latex_available=%s dvisvgm_available=%s runtime_dirs_writable=%s runtime_dir=%s mathtex_effective=%s",
+        "manim-runtime python=%s version=%s manim_importable=%s manim_version=%s ffmpeg_available=%s latex_available=%s dvisvgm_available=%s runtime_dirs_writable=%s runtime_dir=%s mathtex_effective=%s visual_style=%s",
         info.get("python_executable"),
         info.get("python_version"),
         info.get("manim_importable"),
@@ -767,6 +1009,7 @@ def log_manim_runtime_status() -> dict[str, Any]:
         info.get("runtime_directories_writable"),
         MANIM_RUNTIME_DIR,
         info.get("manim_allow_mathtex_effective"),
+        info.get("manim_visual_style"),
     )
     logger.info(
         "manim-runtime dirs runtime=%s scenes=%s work=%s debug_logs=%s health=%s output=%s writable=%s",
@@ -2169,10 +2412,12 @@ def run_manim_scene(
                 "storage": stored_object,
                 "latex_available": has_latex_available(),
                 "text_only_mode": manim_text_only_mode(),
+                "manim_visual_style": (payload or {}).get("manim_visual_style") or effective_manim_visual_style(),
                 "layout_mode": (payload or {}).get("layout_mode"),
                 "region_replacement_used": bool((payload or {}).get("region_replacement_used")),
                 "visual_complexity": (payload or {}).get("visual_complexity"),
                 "repair_used": bool((payload or {}).get("repair_used")),
+                "visible_step_labels_detected": bool((payload or {}).get("visible_step_labels_detected")),
             },
             indent=2,
             ensure_ascii=False,
@@ -2205,6 +2450,7 @@ def run_manim_scene(
         "used_fallback": used_fallback,
         "storage": stored_object,
         "payload": payload,
+        "manim_visual_style": (payload or {}).get("manim_visual_style") or effective_manim_visual_style(),
         "layout_mode": (payload or {}).get("layout_mode"),
         "region_replacement_used": bool((payload or {}).get("region_replacement_used")),
         "visual_complexity": (payload or {}).get("visual_complexity"),
@@ -2261,6 +2507,7 @@ def render_manim_payload(
             "media_duration_seconds": media_duration_seconds,
             "payload": payload,
             "validation": validation,
+            "manim_visual_style": payload.get("manim_visual_style") or effective_manim_visual_style(),
             "layout_mode": payload.get("layout_mode"),
             "region_replacement_used": bool(payload.get("region_replacement_used")),
             "visual_complexity": payload.get("visual_complexity"),

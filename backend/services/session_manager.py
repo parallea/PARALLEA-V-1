@@ -59,8 +59,8 @@ from backend.store.models import (
     new_id,
     utcnow,
 )
-from manim_renderer import direct_manim_validation_error
-from config import MAX_MANIM_VISUAL_DURATION_SECONDS, MIN_VISUAL_TO_AUDIO_DURATION_RATIO
+from manim_renderer import direct_manim_validation_error, visible_step_labels_detected
+from config import MANIM_VISUAL_STYLE, MAX_MANIM_VISUAL_DURATION_SECONDS, MIN_VISUAL_TO_AUDIO_DURATION_RATIO, ROADMAP_PART_MATCH_THRESHOLD
 
 logger = logging.getLogger("parallea.session")
 
@@ -144,8 +144,8 @@ def _greeting_text(student_name: str, persona: dict[str, Any]) -> str:
 def _confirm_persona_only_text(topic: str) -> str:
     topic_show = topic.strip() or "that topic"
     return (
-        f"I haven't uploaded a video on {topic_show} yet, but I can still explain it in my teaching style. "
-        f"Want me to go ahead?"
+        f"I couldn't find this exact topic in the teacher's uploaded videos: {topic_show}. "
+        f"I can still explain it in this teacher's style with visuals. Should I continue?"
     )
 
 
@@ -308,6 +308,11 @@ def _current_roadmap(session: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _current_video(session: dict[str, Any]) -> dict[str, Any] | None:
+    video_id = session.get("current_video_id")
+    if video_id:
+        video = videos_repo.get(video_id)
+        if video:
+            return video
     roadmap = _current_roadmap(session)
     if not roadmap:
         return None
@@ -316,7 +321,7 @@ def _current_video(session: dict[str, Any]) -> dict[str, Any] | None:
 
 def _ordered_parts(roadmap_id: str) -> list[dict[str, Any]]:
     parts = roadmap_parts_repo.where(roadmap_id=roadmap_id)
-    parts.sort(key=lambda p: p.get("order") or 0)
+    parts.sort(key=lambda p: (p.get("order_index") if p.get("order_index") is not None else p.get("order") or 0, p.get("start_time") or 0, p.get("id") or ""))
     return parts
 
 
@@ -425,7 +430,7 @@ def _envelope(session: dict[str, Any], message: dict[str, Any] | None, prompt_fo
         "session": _public_session(session),
         "persona": _public_persona(persona),
         "currentPart": _public_part(part) if part else None,
-        "currentVideo": _public_video(video) if video else None,
+        "currentVideo": _public_video(video, part=part) if video else None,
         "message": _public_message(message) if message else None,
         "promptFor": prompt_for,
         "visual": visual,
@@ -440,10 +445,15 @@ def _public_session(session: dict[str, Any]) -> dict[str, Any]:
         "selected_topic": session.get("selected_topic"),
         "mode": session.get("mode"),
         "current_roadmap_id": session.get("current_roadmap_id"),
+        "current_video_id": session.get("current_video_id"),
         "current_part_id": session.get("current_part_id"),
         "current_part_index": session.get("current_part_index"),
         "matched_part_ids": session.get("matched_part_ids") or [],
         "confidence": session.get("confidence") or 0.0,
+        "last_played_part_id": session.get("last_played_part_id"),
+        "last_video_context_summary": session.get("last_video_context_summary") or "",
+        "last_part_was_final": bool(session.get("last_part_was_final")),
+        "next_suggested_topic": session.get("next_suggested_topic"),
         "memory": _coerce_memory(session),
         "updated_at": session.get("updated_at"),
     }
@@ -472,6 +482,8 @@ def _public_part(part: dict[str, Any]) -> dict[str, Any]:
         "transcript_chunk": part.get("transcript_chunk") or "",
         "start_time": part.get("start_time"),
         "end_time": part.get("end_time"),
+        "next_part_id": part.get("next_part_id"),
+        "order_index": part.get("order_index"),
         "concepts": part.get("concepts") or [],
         "equations": part.get("equations") or [],
         "examples": part.get("examples") or [],
@@ -479,7 +491,7 @@ def _public_part(part: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _public_video(video: dict[str, Any]) -> dict[str, Any]:
+def _public_video(video: dict[str, Any], *, part: dict[str, Any] | None = None) -> dict[str, Any]:
     video_id = video.get("id") or ""
     return {
         "id": video_id,
@@ -487,6 +499,9 @@ def _public_video(video: dict[str, Any]) -> dict[str, Any]:
         "duration": video.get("duration"),
         "thumbnail_url": video.get("thumbnail_url"),
         "stream_url": f"/api/student/videos/{video_id}/stream" if video_id else None,
+        "start_time": (part or {}).get("start_time"),
+        "end_time": (part or {}).get("end_time"),
+        "current_part_id": (part or {}).get("id"),
     }
 
 
@@ -576,12 +591,14 @@ async def set_topic(session_id: str, topic: str, *, record_student: bool = True)
         _record_message(session_id, "student", raw_topic, {"kind": "topic", "cleaned_topic": topic})
     sessions_repo.update(session_id, {"state": "topic_matching"})
     logger.info(
-        "student requested topic selected_persona_id=%s available_topics=%s raw_transcript=%s cleaned_topic=%s current_session_state=%s",
+        "[topic-match] student_query=%s selected_persona_id=%s available_topics=%s raw_transcript=%s cleaned_topic=%s current_session_state=%s threshold=%s",
+        topic,
         persona.get("id"),
         persona.get("detected_topics") or [],
         raw_topic,
         topic,
         "topic_matching",
+        ROADMAP_PART_MATCH_THRESHOLD,
     )
     routing = match_student_topic_to_roadmaps(persona["id"], topic)
     sessions_repo.update(
@@ -591,7 +608,10 @@ async def set_topic(session_id: str, topic: str, *, record_student: bool = True)
             "mode": routing["mode"],
             "matched_part_ids": routing.get("matchedPartIds") or [],
             "current_roadmap_id": routing.get("matchedRoadmapId"),
+            "current_video_id": routing.get("matchedVideoId"),
             "confidence": routing.get("confidence", 0.0),
+            "last_part_was_final": False,
+            "next_suggested_topic": None,
         },
     )
     _sync_session_memory_after_message(
@@ -604,11 +624,17 @@ async def set_topic(session_id: str, topic: str, *, record_student: bool = True)
         },
     )
     logger.info(
-        "topic match result selected_persona_id=%s matched_roadmap_id=%s matched_confidence=%s topic_exists=%s",
+        "[topic-match] result selected_persona_id=%s matched_roadmap_id=%s matched_video_id=%s matched_part_id=%s matched_part_title=%s confidence=%s topic_exists=%s start_time=%s end_time=%s reason=%s",
         persona.get("id"),
         routing.get("matchedRoadmapId"),
+        routing.get("matchedVideoId"),
+        routing.get("matchedPartId"),
+        routing.get("matchedPartTitle"),
         routing.get("confidence", 0.0),
         routing.get("topicExists"),
+        routing.get("start_time"),
+        routing.get("end_time"),
+        routing.get("matchReason"),
     )
     if routing["topicExists"]:
         return _start_uploaded_video_part(session_id, routing)
@@ -629,81 +655,73 @@ async def set_topic(session_id: str, topic: str, *, record_student: bool = True)
 
 def _start_video_context_teaching(session_id: str, routing: dict[str, Any]) -> dict[str, Any]:
     return _start_uploaded_video_part(session_id, routing)
-    session = sessions_repo.get(session_id)
-    parts_ids = routing.get("matchedPartIds") or []
-    first_part_id = parts_ids[0] if parts_ids else None
-    if not first_part_id:
-        # Roadmap exists but no parts matched specifically — fall back to first part of the roadmap.
-        ordered = _ordered_parts(routing["matchedRoadmapId"])
-        first_part_id = ordered[0]["id"] if ordered else None
-    if not first_part_id:
-        sessions_repo.update(session_id, {"state": "persona_only_confirmation", "mode": "persona_only"})
-        msg = _record_message(session_id, "assistant", _confirm_persona_only_text(routing.get("studentTopic", "")), {"kind": "confirm", "fallback": "no_parts"})
-        return _envelope(sessions_repo.get(session_id), msg, prompt_for="confirmation")
-
-    first_part = roadmap_parts_repo.get(first_part_id)
-    sessions_repo.update(
-        session_id,
-        {
-            "state": "playing_video_part",
-            "current_part_id": first_part_id,
-            "current_part_index": (first_part or {}).get("order") or 0,
-        },
-    )
-    concepts = ", ".join((first_part or {}).get("concepts") or [])
-    intro = (
-        f"Got it. Let's start with: {(first_part or {}).get('title') or 'the first part'}. "
-        f"{(first_part or {}).get('summary') or ''}"
-    ).strip()
-    if concepts:
-        intro = f"{intro} The key ideas here are {concepts}."
-    msg = _record_message(session_id, "assistant", intro, {"kind": "teach_part_intro", "routing": routing, "part_id": first_part_id})
-    sessions_repo.update(session_id, {"state": "awaiting_part_feedback"})
-    follow_up = _record_message(
-        session_id,
-        "assistant",
-        f"{intro}\n\nDo you have any questions about this part before we move forward?",
-        {"kind": "ask_question_check", "part_id": first_part_id},
-    )
-    return _envelope(sessions_repo.get(session_id), follow_up, prompt_for="next")
 
 
 def _start_uploaded_video_part(session_id: str, routing: dict[str, Any]) -> dict[str, Any]:
     roadmap_id = routing.get("matchedRoadmapId")
-    ordered = _ordered_parts(roadmap_id) if roadmap_id else []
-    first_part_id = ordered[0]["id"] if ordered else None
-    if not first_part_id:
+    matched_part_id = routing.get("matchedPartId") or routing.get("matched_part_id")
+    if not matched_part_id:
+        part_ids = routing.get("matchedPartIds") or []
+        matched_part_id = part_ids[0] if part_ids else None
+
+    matched_part = roadmap_parts_repo.get(matched_part_id or "")
+    if not matched_part:
         sessions_repo.update(session_id, {"state": "persona_only_confirmation", "mode": "persona_only"})
         msg = _record_message(
             session_id,
             "assistant",
             _confirm_persona_only_text(routing.get("studentTopic", "")),
-            {"kind": "confirm", "fallback": "no_parts"},
+            {"kind": "confirm", "fallback": "no_strong_part_match", "routing": routing},
         )
         return _envelope(sessions_repo.get(session_id), msg, prompt_for="confirmation")
 
-    first_part = roadmap_parts_repo.get(first_part_id)
+    roadmap_id = roadmap_id or matched_part.get("roadmap_id")
+    roadmap = roadmaps_repo.get(roadmap_id or "")
+    video_id = routing.get("matchedVideoId") or (roadmap or {}).get("video_id")
+    video = videos_repo.get(video_id or "")
+    if not roadmap or not video:
+        sessions_repo.update(session_id, {"state": "persona_only_confirmation", "mode": "persona_only"})
+        msg = _record_message(
+            session_id,
+            "assistant",
+            _confirm_persona_only_text(routing.get("studentTopic", "")),
+            {"kind": "confirm", "fallback": "missing_video_segment", "routing": routing},
+        )
+        return _envelope(sessions_repo.get(session_id), msg, prompt_for="confirmation")
+
+    ordered = _ordered_parts(roadmap_id)
+    current_idx = next((idx for idx, item in enumerate(ordered) if item.get("id") == matched_part.get("id")), 0)
+    current_order = matched_part.get("order_index") if matched_part.get("order_index") is not None else matched_part.get("order") or current_idx
+    matched_ids = routing.get("matchedPartIds") or [item.get("id") for item in ordered[current_idx:] if item.get("id")]
     sessions_repo.update(
         session_id,
         {
             "state": "playing_video_part",
-            "current_part_id": first_part_id,
-            "current_part_index": (first_part or {}).get("order") or 0,
-            "matched_part_ids": [part["id"] for part in ordered],
+            "mode": "video_context",
+            "current_roadmap_id": roadmap_id,
+            "current_video_id": video.get("id"),
+            "current_part_id": matched_part.get("id"),
+            "current_part_index": current_order,
+            "matched_part_ids": matched_ids,
+            "last_part_was_final": False,
         },
     )
     _sync_session_memory_after_message(
         session_id,
         updates={
-            "current_step": f"part {(first_part or {}).get('order')}: {(first_part or {}).get('title') or first_part_id}",
+            "current_step": f"part {current_order}: {matched_part.get('title') or matched_part.get('id')}",
             "next_teaching_goal": "Play the original uploaded teacher video part before asking for questions.",
         },
     )
     logger.info(
-        "current roadmap part selected session=%s matched_roadmap_id=%s current_roadmap_part_id=%s current_session_state=%s",
+        "[video-flow] playing matched part, not first part session=%s matched_roadmap_id=%s matched_video_id=%s current_part=%s part_order=%s start_time=%s end_time=%s current_session_state=%s",
         session_id,
         roadmap_id,
-        first_part_id,
+        video.get("id"),
+        matched_part.get("id"),
+        current_order,
+        matched_part.get("start_time"),
+        matched_part.get("end_time"),
         "playing_video_part",
     )
     return _video_part_ready_envelope(session_id, routing=routing)
@@ -727,7 +745,7 @@ def _video_part_ready_envelope(session_id: str, *, routing: dict[str, Any] | Non
     start = part.get("start_time")
     end = part.get("end_time")
     logger.info(
-        "original video segment ready session=%s matched_roadmap_id=%s current_roadmap_part_id=%s video_id=%s start=%s end=%s current_session_state=%s",
+        "[video-flow] original video segment ready session=%s matched_roadmap_id=%s current_part=%s video_id=%s start_time=%s end_time=%s current_session_state=%s",
         session_id,
         roadmap.get("id"),
         part.get("id"),
@@ -750,6 +768,31 @@ def _video_part_ready_envelope(session_id: str, *, routing: dict[str, Any] | Non
         },
     )
     return _envelope(sessions_repo.get(session_id), msg, prompt_for="video_part")
+
+
+def _next_part_after(roadmap_id: str, current_part: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not roadmap_id or not current_part:
+        return None
+    explicit_next_id = current_part.get("next_part_id")
+    if explicit_next_id:
+        explicit = roadmap_parts_repo.get(explicit_next_id)
+        if explicit and explicit.get("roadmap_id") == roadmap_id:
+            return explicit
+    parts = _ordered_parts(roadmap_id)
+    current_id = current_part.get("id")
+    idx = next((i for i, p in enumerate(parts) if p.get("id") == current_id), -1)
+    if idx < 0:
+        current_order = current_part.get("order_index") if current_part.get("order_index") is not None else current_part.get("order")
+        for part in parts:
+            part_order = part.get("order_index") if part.get("order_index") is not None else part.get("order")
+            if current_order is not None and part_order is not None and part_order > current_order:
+                return part
+        return None
+    return parts[idx + 1] if idx + 1 < len(parts) else None
+
+
+def _part_is_final(roadmap_id: str, current_part: dict[str, Any] | None) -> bool:
+    return _next_part_after(roadmap_id, current_part) is None
 
 
 async def teach_current_roadmap_part(session_id: str, routing: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -785,7 +828,16 @@ def mark_video_part_ended(session_id: str) -> Optional[dict[str, Any]]:
         )
         return _envelope(sessions_repo.get(session_id), msg, prompt_for="topic")
 
-    sessions_repo.update(session_id, {"state": "awaiting_part_feedback"})
+    is_final = _part_is_final(roadmap.get("id") or "", part)
+    sessions_repo.update(
+        session_id,
+        {
+            "state": "awaiting_part_feedback",
+            "last_played_part_id": part.get("id"),
+            "last_video_context_summary": part.get("summary") or part.get("transcript_chunk") or "",
+            "last_part_was_final": is_final,
+        },
+    )
     msg = _record_message(
         session_id,
         "assistant",
@@ -795,14 +847,16 @@ def mark_video_part_ended(session_id: str) -> Optional[dict[str, Any]]:
             "source": "original_video_part",
             "roadmap_id": roadmap.get("id"),
             "part_id": part.get("id"),
+            "last_part_was_final": is_final,
             "askFollowUp": PART_UNDERSTANDING_QUESTION,
         },
     )
     logger.info(
-        "part-end follow-up triggered session=%s matched_roadmap_id=%s current_roadmap_part_id=%s current_session_state=%s",
+        "[video-flow] part ended follow-up triggered session=%s matched_roadmap_id=%s current_part=%s last_part_was_final=%s current_session_state=%s",
         session_id,
         roadmap.get("id"),
         part.get("id"),
+        str(is_final).lower(),
         "awaiting_part_feedback",
     )
     return _envelope(sessions_repo.get(session_id), msg, prompt_for="part_feedback")
@@ -879,49 +933,226 @@ async def send_message(session_id: str, content: str) -> Optional[dict[str, Any]
     return await _clarify_current_roadmap_part(session_id, student_text)
 
 
-async def _advance_to_next_part(session_id: str) -> dict[str, Any]:
-    session = sessions_repo.get(session_id)
-    roadmap_id = session.get("current_roadmap_id")
-    if not roadmap_id:
-        sessions_repo.update(session_id, {"state": "completed"})
-        msg = _record_message(session_id, "assistant", "Looks like we wrapped that one up. Want to learn something else?", {"kind": "completed"})
-        return _envelope(sessions_repo.get(session_id), msg, prompt_for="topic")
-    parts = _ordered_parts(roadmap_id)
-    current_id = session.get("current_part_id")
-    idx = next((i for i, p in enumerate(parts) if p["id"] == current_id), -1)
-    next_idx = idx + 1
-    if next_idx >= len(parts):
-        sessions_repo.update(session_id, {"state": "completed", "current_part_id": None})
-        msg = _record_message(
-            session_id,
-            "assistant",
-            "That's the end of this roadmap. Want to dive into something else, or wrap up here?",
-            {"kind": "completed_roadmap"},
-        )
-        return _envelope(sessions_repo.get(session_id), msg, prompt_for="topic")
-    next_part = parts[next_idx]
+def suggest_next_topic_after_roadmap(
+    session: dict[str, Any],
+    persona: dict[str, Any],
+    roadmap: dict[str, Any],
+    current_part: dict[str, Any],
+    recent_messages: list[dict[str, Any]] | None = None,
+) -> dict[str, str]:
+    """Suggest a lightweight next topic after uploaded lesson parts end.
+
+    This is intentionally deterministic. It avoids a new model dependency in
+    the continue path and can later be replaced by an LLM-backed advisor.
+    """
+    del recent_messages
+    roadmap_title = (roadmap or {}).get("title") or session.get("selected_topic") or "this lesson"
+    last_title = (current_part or {}).get("title") or roadmap_title
+    part_text = " ".join(
+        [
+            str((current_part or {}).get("title") or ""),
+            str((current_part or {}).get("summary") or ""),
+            " ".join((current_part or {}).get("concepts") or []),
+        ]
+    ).lower()
+    candidates: list[str] = []
+    for topic in (roadmap or {}).get("topics") or []:
+        value = str(topic or "").strip()
+        if value and value.lower() not in part_text:
+            candidates.append(value)
+    for topic in (persona or {}).get("detected_topics") or []:
+        value = str(topic or "").strip()
+        if value and value.lower() not in part_text:
+            candidates.append(value)
+    if candidates:
+        next_topic = candidates[0]
+        reason = "It is the next useful related topic from the teacher's roadmap metadata."
+    else:
+        next_topic = f"applying {roadmap_title} to new examples"
+        reason = f"It naturally extends the final uploaded part, {last_title}."
+    transition = (
+        f"That was the last uploaded video part for this lesson. "
+        f"The next useful topic is {next_topic}. "
+        f"I'll explain it in this teacher's style with visuals."
+    )
+    return {"next_topic": next_topic, "reason": reason, "short_transition_sentence": transition}
+
+
+def _persona_continuation_context(roadmap: dict[str, Any], current_part: dict[str, Any], suggestion: dict[str, str]) -> str:
+    return "\n".join(
+        [
+            "The uploaded teacher video lesson has ended.",
+            "Continue by teaching the next logical topic in the teacher persona style.",
+            f"ROADMAP_TITLE: {(roadmap or {}).get('title') or ''}",
+            f"ROADMAP_SUMMARY: {(roadmap or {}).get('summary') or ''}",
+            f"LAST_PART_TITLE: {(current_part or {}).get('title') or ''}",
+            f"LAST_PART_SUMMARY: {(current_part or {}).get('summary') or ''}",
+            f"LAST_PART_CONCEPTS: {', '.join((current_part or {}).get('concepts') or [])}",
+            f"SUGGESTED_NEXT_TOPIC: {suggestion.get('next_topic') or ''}",
+            f"SUGGESTION_REASON: {suggestion.get('reason') or ''}",
+        ]
+    )
+
+
+async def _start_persona_continuation_after_video(
+    session_id: str,
+    *,
+    roadmap: dict[str, Any],
+    current_part: dict[str, Any],
+) -> dict[str, Any]:
+    session = sessions_repo.get(session_id) or {}
+    persona = _persona_for_session(session) or {}
+    student = _student_for_session(session) or {}
+    memory = _session_memory_for_prompt(session_id)
+    previous_answer = str(memory.get("last_assistant_answer") or "")
+    suggestion = suggest_next_topic_after_roadmap(session, persona, roadmap, current_part, memory.get("recent_turns") or [])
+    next_topic = suggestion.get("next_topic") or f"applying {(roadmap or {}).get('title') or 'this lesson'}"
+    transition = suggestion.get("short_transition_sentence") or (
+        f"That was the last uploaded video part for this lesson. The next useful topic is {next_topic}. "
+        "I'll explain it in this teacher's style with visuals."
+    )
     sessions_repo.update(
         session_id,
         {
-            "state": "playing_video_part",
-            "current_part_id": next_part["id"],
-            "current_part_index": next_part.get("order") or next_idx,
+            "state": "persona_only_teaching",
+            "mode": "persona_continuation_after_video",
+            "selected_topic": next_topic,
+            "current_part_id": None,
+            "current_video_id": None,
+            "next_suggested_topic": next_topic,
+            "last_part_was_final": True,
         },
     )
     _sync_session_memory_after_message(
         session_id,
         updates={
-            "current_step": f"part {next_part.get('order')}: {next_part.get('title') or next_part.get('id')}",
+            "current_topic": next_topic,
+            "current_step": "persona continuation after uploaded lesson",
+            "next_teaching_goal": f"Teach {next_topic} with Manim visuals after the uploaded lesson ends.",
+            "unresolved_student_question": "",
+        },
+    )
+    logger.info(
+        "[persona-continuation] next_topic=%s reason=%s session=%s roadmap=%s last_part=%s",
+        next_topic,
+        suggestion.get("reason") or "",
+        session_id,
+        roadmap.get("id"),
+        current_part.get("id"),
+    )
+    payload = await generate_teaching_response_with_visuals(
+        mode="persona_only_teaching",
+        persona_prompt=persona.get("active_persona_prompt") or "",
+        teacher_name=persona.get("teacher_name") or "",
+        teacher_profession=persona.get("profession") or "",
+        student_name=student.get("name") or "",
+        topic=next_topic,
+        student_query=transition,
+        current_roadmap_part=None,
+        part_context=_persona_continuation_context(roadmap, current_part, suggestion),
+        available_visual_mode="manim",
+        session_memory=_session_memory_for_prompt(session_id),
+        previous_assistant_answer=previous_answer,
+    )
+    assistant_message_id = new_id("msg")
+    visual = await _render_teaching_visual(
+        session_id,
+        payload,
+        message_id=assistant_message_id,
+        student_query=transition,
+        title=next_topic or "Next topic",
+        subtitle=suggestion.get("reason") or "Persona continuation after uploaded lesson",
+        cache_segment_id=f"persona_continuation_{session_id}_{next_topic}"[:160],
+    )
+    speech_text = ((payload.get("speech") or {}).get("text") or "").strip()
+    ask_followup = ((payload.get("teachingControl") or {}).get("askFollowUp") or payload.get("askFollowUp") or CLARIFICATION_FOLLOWUP)
+    content = _append_followup(f"{transition}\n\n{speech_text}".strip(), ask_followup)
+    msg = _record_message(
+        session_id,
+        "assistant",
+        content,
+        {
+            "kind": "persona_continuation_after_video",
+            "source": "persona_continuation_after_video",
+            "roadmap_id": roadmap.get("id"),
+            "last_part_id": current_part.get("id"),
+            "next_topic": next_topic,
+            "suggestion": suggestion,
+            "speech": payload.get("speech") or {},
+            "syncPlan": payload.get("syncPlan") or {},
+            "teachingStateUpdate": payload.get("teachingStateUpdate") or {},
+            "visualPlanWithTimestamps": payload.get("visualPlanWithTimestamps") or [],
+            "askFollowUp": ask_followup,
+            "teachingControl": payload.get("teachingControl") or {},
+            "debug": payload.get("debug") or {},
+            "visual": visual,
+        },
+        message_id=assistant_message_id,
+    )
+    return _envelope(sessions_repo.get(session_id), msg, prompt_for="reply", visual=visual)
+
+
+async def _advance_to_next_part(session_id: str) -> dict[str, Any]:
+    session = sessions_repo.get(session_id)
+    if not session:
+        return {"session": {}, "persona": {}, "currentPart": None, "currentVideo": None, "message": None, "promptFor": "topic", "visual": None}
+    roadmap_id = session.get("current_roadmap_id")
+    if not roadmap_id:
+        sessions_repo.update(session_id, {"state": "completed"})
+        msg = _record_message(session_id, "assistant", "Looks like we wrapped that one up. Want to learn something else?", {"kind": "completed"})
+        return _envelope(sessions_repo.get(session_id), msg, prompt_for="topic")
+    roadmap = roadmaps_repo.get(roadmap_id)
+    current_part = _current_part(session)
+    if not roadmap or not current_part:
+        sessions_repo.update(session_id, {"state": "awaiting_topic"})
+        msg = _record_message(
+            session_id,
+            "assistant",
+            "I lost the current video part. Tell me the topic again and I will match it to the uploaded lesson.",
+            {"kind": "missing_current_part"},
+        )
+        return _envelope(sessions_repo.get(session_id), msg, prompt_for="topic")
+    next_part = _next_part_after(roadmap_id, current_part)
+    logger.info(
+        "[video-flow] continue requested current_part=%s next_part=%s roadmap=%s session=%s",
+        current_part.get("id"),
+        (next_part or {}).get("id"),
+        roadmap_id,
+        session_id,
+    )
+    if not next_part:
+        logger.info("[video-flow] last part reached; switching to persona continuation session=%s current_part=%s", session_id, current_part.get("id"))
+        return await _start_persona_continuation_after_video(session_id, roadmap=roadmap, current_part=current_part)
+    parts = _ordered_parts(roadmap_id)
+    next_idx = next((i for i, p in enumerate(parts) if p.get("id") == next_part.get("id")), 0)
+    video = videos_repo.get(roadmap.get("video_id") or "")
+    sessions_repo.update(
+        session_id,
+        {
+            "state": "playing_video_part",
+            "mode": "video_context",
+            "current_video_id": (video or {}).get("id") or session.get("current_video_id"),
+            "current_part_id": next_part["id"],
+            "current_part_index": next_part.get("order_index") if next_part.get("order_index") is not None else next_part.get("order") or next_idx,
+            "last_part_was_final": False,
+        },
+    )
+    _sync_session_memory_after_message(
+        session_id,
+        updates={
+            "current_step": f"part {next_part.get('order_index') if next_part.get('order_index') is not None else next_part.get('order')}: {next_part.get('title') or next_part.get('id')}",
             "next_teaching_goal": "Continue to the next uploaded teacher video part.",
             "unresolved_student_question": "",
         },
     )
     logger.info(
-        "next part selected session=%s matched_roadmap_id=%s current_roadmap_part_id=%s next_index=%s",
+        "[video-flow] next part selected session=%s matched_roadmap_id=%s current_part=%s next_index=%s start_time=%s end_time=%s",
         session_id,
         roadmap_id,
         next_part.get("id"),
         next_idx,
+        next_part.get("start_time"),
+        next_part.get("end_time"),
     )
     return _video_part_ready_envelope(session_id)
 
@@ -1072,6 +1303,13 @@ def _visual_complexity_label(visual_plan: Any, code: str) -> str:
     return "medium"
 
 
+def _region_replacement_signal(code: str, visual_style: str) -> bool:
+    text = code or ""
+    if visual_style == "strict_layout":
+        return True
+    return any(token in text for token in ("replace_region(", "FadeOut(", "ReplacementTransform(", "Transform("))
+
+
 def _visual_step_duration_seconds(visual_plan: Any) -> float:
     if not isinstance(visual_plan, list):
         return 0.0
@@ -1168,15 +1406,19 @@ async def _render_teaching_visual(
         }
     code = (visual_payload.get("manimCode") or "").strip()
     code_source = (visual_payload.get("manimCodeSource") or "ai_generated" if code else "local_fallback")
+    visual_style = str(MANIM_VISUAL_STYLE or "creative_safe").strip().lower() or "creative_safe"
     repair_attempted = False
     repair_used = False
     validation_error = direct_manim_validation_error(code) if code else "empty Manim code"
     visual_prompt = (visual_payload.get("visualPrompt") or visual_payload.get("manimPlan") or "").strip()
+    visible_step_labels = visible_step_labels_detected(code) if code else False
     logger.info(
-        "[teaching-visual] visualNeeded=true visualType=manim code_chars=%s code_source=%s validation_error=%s visual_prompt_chars=%s session=%s title=%s",
+        "[teaching-visual] visualNeeded=true visualType=manim code_chars=%s code_source=%s manim_visual_style=%s validation_error=%s visible_step_labels_detected=%s visual_prompt_chars=%s session=%s title=%s",
         len(code),
         code_source,
+        visual_style,
         validation_error,
+        str(visible_step_labels).lower(),
         len(visual_prompt),
         session_id,
         title,
@@ -1192,6 +1434,18 @@ async def _render_teaching_visual(
         av_sync["visual_step_count"],
         av_sync["spoken_segment_count"],
     )
+    if visual_style == "fallback_only":
+        logger.warning("[manim] MANIM_VISUAL_STYLE=fallback_only; using local fallback scene session=%s title=%s", session_id, title)
+        code = build_fallback_manim_code(
+            title=title,
+            topic=(payload.get("teachingStateUpdate") or {}).get("current_topic") or title,
+            spoken_answer=speech_text,
+            visual_plan=visual_plan if isinstance(visual_plan, list) else [],
+            target_duration_seconds=av_sync["target_visual_duration_seconds"],
+        )
+        code_source = "local_fallback"
+        validation_error = direct_manim_validation_error(code)
+        visible_step_labels = visible_step_labels_detected(code)
     if validation_error:
         logger.warning("[manim] generated code validation failed before render; attempting one repair session=%s title=%s error=%s", session_id, title, validation_error)
         repair_attempted = True
@@ -1228,6 +1482,7 @@ async def _render_teaching_visual(
 
     sync_plan = payload.get("syncPlan") or {}
     visual_complexity = _visual_complexity_label(visual_plan, code)
+    region_replacement_used = _region_replacement_signal(code, visual_style)
     renderer_payload = {
         "renderer_version": "openai_direct_manim_v1",
         "scene_type": "openai_direct",
@@ -1243,19 +1498,25 @@ async def _render_teaching_visual(
         "student_query": student_query,
         "visual_prompt": visual_prompt,
         "manim_code_source": code_source,
-        "layout_mode": "region_safe",
-        "region_replacement_used": True,
+        "manim_visual_style": visual_style,
+        "layout_mode": "region_safe" if visual_style == "strict_layout" or code_source == "local_fallback" else "creative_safe",
+        "region_replacement_used": region_replacement_used,
         "visual_complexity": visual_complexity,
         "repair_used": repair_used,
         "repair_attempted": repair_attempted,
         "fallback_attempted": False,
         "render_failure_stage": "repaired" if repair_used else "generated",
+        "visible_step_labels_detected": visible_step_labels,
+        "visual_steps": av_sync.get("visual_steps") if isinstance(av_sync.get("visual_steps"), list) else [],
+        "spoken_segments": av_sync.get("spoken_segments") if isinstance(av_sync.get("spoken_segments"), list) else [],
         "av_sync": {
             "word_count": av_sync["word_count"],
             "estimated_spoken_duration_seconds": av_sync["estimated_spoken_duration_seconds"],
             "target_visual_duration_seconds": av_sync["target_visual_duration_seconds"],
             "spoken_segment_count": av_sync["spoken_segment_count"],
             "visual_step_count": av_sync["visual_step_count"],
+            "visual_steps": av_sync.get("visual_steps") if isinstance(av_sync.get("visual_steps"), list) else [],
+            "spoken_segments": av_sync.get("spoken_segments") if isinstance(av_sync.get("spoken_segments"), list) else [],
             "min_visual_to_audio_duration_ratio": MIN_VISUAL_TO_AUDIO_DURATION_RATIO,
         },
     }
@@ -1290,10 +1551,13 @@ async def _render_teaching_visual(
                         **renderer_payload,
                         "manim_code": repaired_code,
                         "manim_code_source": repaired.get("source") or "ai_repaired",
+                        "layout_mode": "region_safe" if visual_style == "strict_layout" else "creative_safe",
+                        "region_replacement_used": _region_replacement_signal(repaired_code, visual_style),
                         "repair_used": True,
                         "repair_attempted": True,
                         "render_failure_stage": "repaired",
                         "visual_complexity": _visual_complexity_label(visual_plan, repaired_code),
+                        "visible_step_labels_detected": visible_step_labels_detected(repaired_code),
                     }
                     try:
                         rendered = await render_manim_payload_async(
@@ -1357,11 +1621,14 @@ async def _render_teaching_visual(
                 **renderer_payload,
                 "manim_code": repaired_code,
                 "manim_code_source": repaired.get("source") or "ai_duration_repaired",
+                "layout_mode": "region_safe" if visual_style == "strict_layout" else "creative_safe",
+                "region_replacement_used": _region_replacement_signal(repaired_code, visual_style),
                 "repair_used": True,
                 "repair_attempted": True,
                 "render_failure_stage": "duration_repair",
                 "visual_complexity": _visual_complexity_label(visual_plan, repaired_code),
                 "duration_repair_reason": duration_error,
+                "visible_step_labels_detected": visible_step_labels_detected(repaired_code),
             }
             rendered = await render_manim_payload_async(
                 repair_payload,
@@ -1388,6 +1655,18 @@ async def _render_teaching_visual(
         validation = (rendered.get("payload") or {}).get("manim_code_validation") or rendered.get("validation")
         used_fallback = bool(rendered.get("used_fallback") or (validation or {}).get("fallback_used"))
         logger.info(
+            "[manim-diagnostics] manim_visual_style=%s original_code_render_attempted=%s validation_result=%s repair_attempted=%s fallback_used=%s estimated_audio_duration=%s manim_duration=%s duration_ratio=%s visible_step_labels_detected=%s",
+            visual_style,
+            bool((validation or {}).get("original_code_render_attempted", code_source != "local_fallback")),
+            (validation or {}).get("validation_result") or ("ok" if not (validation or {}).get("error") else "failed"),
+            str(repair_attempted).lower(),
+            str(used_fallback).lower(),
+            av_sync["estimated_spoken_duration_seconds"],
+            rendered.get("media_duration_seconds"),
+            duration_ratio,
+            str(bool((validation or {}).get("visible_step_labels_detected") or renderer_payload.get("visible_step_labels_detected"))).lower(),
+        )
+        logger.info(
             "[manim] public_url=%s used_fallback=%s code_source=%s cache_hit=%s session=%s title=%s",
             media_log_ref,
             used_fallback,
@@ -1405,8 +1684,9 @@ async def _render_teaching_visual(
             "media_url": media_url,
             "usedFallback": used_fallback,
             "manimCodeSource": code_source,
-            "layout_mode": "region_safe",
-            "region_replacement_used": True,
+            "manim_visual_style": visual_style,
+            "layout_mode": renderer_payload.get("layout_mode"),
+            "region_replacement_used": bool(renderer_payload.get("region_replacement_used")),
             "visual_complexity": renderer_payload.get("visual_complexity") or visual_complexity,
             "repair_used": repair_used,
             "repair_attempted": repair_attempted,
@@ -1426,8 +1706,9 @@ async def _render_teaching_visual(
                 "duration_sec": renderer_payload["duration_sec"],
                 "used_fallback": used_fallback,
                 "manim_code_source": code_source,
-                "layout_mode": "region_safe",
-                "region_replacement_used": True,
+                "manim_visual_style": visual_style,
+                "layout_mode": renderer_payload.get("layout_mode"),
+                "region_replacement_used": bool(renderer_payload.get("region_replacement_used")),
                 "visual_complexity": renderer_payload.get("visual_complexity") or visual_complexity,
                 "repair_used": repair_used,
                 "repair_attempted": repair_attempted,
@@ -1436,6 +1717,7 @@ async def _render_teaching_visual(
                 "visual_to_audio_duration_ratio": duration_ratio,
                 "spoken_segments_count": av_sync["spoken_segment_count"],
                 "visual_steps_count": av_sync["visual_step_count"],
+                "visible_step_labels_detected": bool((validation or {}).get("visible_step_labels_detected") or renderer_payload.get("visible_step_labels_detected")),
                 "validation": validation,
                 "cache_hit": bool(rendered.get("cache_hit")),
             },
@@ -1462,6 +1744,7 @@ async def _render_teaching_visual(
             "repair_attempted": repair_attempted,
             "fallback_attempted": True,
             "render_failure_stage": "fallback",
+            "visible_step_labels_detected": visible_step_labels_detected(fallback_code),
             "previous_failure_debug": primary_debug_artifacts,
         }
         try:
@@ -1483,6 +1766,17 @@ async def _render_teaching_visual(
             )
             media_url = rendered.get("video_url") or rendered.get("media_url") or rendered.get("public_url")
             media_log_ref = ((rendered.get("storage") or {}).get("object_key") or media_url)
+            logger.info(
+                "[manim-diagnostics] manim_visual_style=%s original_code_render_attempted=%s validation_result=%s repair_attempted=%s fallback_used=true estimated_audio_duration=%s manim_duration=%s duration_ratio=%s visible_step_labels_detected=%s",
+                visual_style,
+                str(code_source != "local_fallback").lower(),
+                "fallback",
+                str(repair_attempted).lower(),
+                av_sync["estimated_spoken_duration_seconds"],
+                rendered.get("media_duration_seconds"),
+                fallback_ratio,
+                str(bool(fallback_payload.get("visible_step_labels_detected"))).lower(),
+            )
             logger.info("[manim] local fallback render succeeded session=%s title=%s url=%s", session_id, title, media_log_ref)
             return {
                 "type": "manim",
@@ -1493,6 +1787,7 @@ async def _render_teaching_visual(
                 "media_url": media_url,
                 "usedFallback": True,
                 "manimCodeSource": "local_fallback",
+                "manim_visual_style": visual_style,
                 "layout_mode": "region_safe",
                 "region_replacement_used": True,
                 "visual_complexity": fallback_payload.get("visual_complexity"),
@@ -1514,6 +1809,7 @@ async def _render_teaching_visual(
                     "duration_sec": fallback_payload["duration_sec"],
                     "used_fallback": True,
                     "manim_code_source": "local_fallback",
+                    "manim_visual_style": visual_style,
                     "layout_mode": "region_safe",
                     "region_replacement_used": True,
                     "visual_complexity": fallback_payload.get("visual_complexity"),
@@ -1524,6 +1820,7 @@ async def _render_teaching_visual(
                     "visual_to_audio_duration_ratio": fallback_ratio,
                     "spoken_segments_count": av_sync["spoken_segment_count"],
                     "visual_steps_count": av_sync["visual_step_count"],
+                    "visible_step_labels_detected": bool(fallback_payload.get("visible_step_labels_detected")),
                     "previous_failure_debug": primary_debug_artifacts,
                     "cache_hit": bool(rendered.get("cache_hit")),
                 },
@@ -1541,8 +1838,9 @@ async def _render_teaching_visual(
             "media_url": None,
             "usedFallback": False,
             "manimCodeSource": code_source,
-            "layout_mode": "region_safe",
-            "region_replacement_used": True,
+            "manim_visual_style": visual_style,
+            "layout_mode": renderer_payload.get("layout_mode"),
+            "region_replacement_used": bool(renderer_payload.get("region_replacement_used")),
             "visual_complexity": visual_complexity,
             "repair_used": repair_used,
             "repair_attempted": repair_attempted,
